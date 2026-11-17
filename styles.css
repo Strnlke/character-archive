@@ -151,3 +151,8 @@
 .treeDropDialog select{width:100%}
 @media(max-width:850px){.treeConnectForm{grid-template-columns:1fr 1fr}}
 @media(max-width:550px){.treeConnectForm{grid-template-columns:1fr}.undoTopButton{padding:8px 10px}}
+
+/* v3.5 — in-app view refresh and per-page undo */
+#refreshViewBtn{border-color:#426080;color:#c9dcf4;white-space:nowrap}
+#refreshViewBtn:hover{background:#233c56}
+#refreshViewBtn:disabled{opacity:.55;cursor:wait}

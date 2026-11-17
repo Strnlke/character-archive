@@ -5,15 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1018">
   <title>Character Bookshelf</title>
-  <link rel="stylesheet" href="styles.css?v=3.4">
-  <script src="app.js?v=3.4" defer></script>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand"><span class="brand-icon">✦</span><div><strong>Character Bookshelf</strong><small>Your writing library</small></div></div>
     <div class="topactions">
       <span id="saveStatus" class="status" role="status" aria-live="polite">No folder selected</span>
-      <button id="undoBtn" type="button" class="undoTopButton" disabled title="Undo the last reversible action in this library">↶ Undo</button>
+      <button id="refreshViewBtn" type="button" class="quiet hidden" title="Reload this view from your USB folder without starting over">↻ Refresh view</button>
+      <button id="undoBtn" type="button" class="undoTopButton" disabled title="Undo the last reversible action on this page">↶ Undo</button>
       <button id="retrySaveBtn" class="warning hidden" type="button">Retry save</button>
       <button id="downloadUnsavedBtn" class="quiet hidden" type="button">Download unsaved profile</button>
       <button id="topSwitchWriterBtn" class="quiet hidden" type="button">⇄ Switch writer</button>

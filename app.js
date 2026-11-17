@@ -31,38 +31,125 @@ const state = {
   revision: 0, savedRevision: 0, portraitUrl: null, galleryUrls: [], epoch: 0, treeMeta: null, treeRevision: 0, treeSavedRevision: 0, treeTimer: null, treeSaving: null
 };
 
-// One reversible action, held only in this browser tab. It never takes the place
-// of a real USB backup. Confirmed permanent deletes cannot be undone.
-let lastUndo = null, undoBusy = false, fieldFocusSerial = 0;
+// One reversible action PER PAGE, held in this browser tab only. This is not a
+// recovery system for permanently deleted USB files and is reset on browser reload.
+const undoByPage = new Map();
+let undoBusy = false, fieldFocusSerial = 0;
+const NAV_KEY = 'character-bookshelf-navigation-v35';
+function pageType() {
+  if (!state.root) return 'folder';
+  if ($('workspace').classList.contains('hidden')) return 'writers';
+  for (const [id, kind] of [['bookshelfView','bookshelf'],['novelView','characters'],['treeView','tree'],['editor','editor']]) {
+    if (!$(id).classList.contains('hidden')) return kind;
+  }
+  return 'bookshelf';
+}
+function pageUndoKey(kind = pageType()) {
+  const library = state.manifest?.createdAt || state.root?.name || 'library';
+  if (kind === 'writers') return library + '/writers';
+  const writer = state.writer?.id || '-';
+  if (kind === 'bookshelf') return [library,writer,'bookshelf'].join('/');
+  const novel = state.novel?.id || '-';
+  if (kind === 'editor') return [library,writer,novel,'editor',state.active?.id || '-'].join('/');
+  return [library,writer,novel,kind].join('/');
+}
 function updateUndoButton() {
   const button = $('undoBtn'); if (!button) return;
-  button.disabled = !lastUndo || undoBusy;
-  button.title = lastUndo ? 'Undo: ' + lastUndo.label : 'No reversible action to undo';
-  button.textContent = lastUndo ? '↶ Undo: ' + lastUndo.label : '↶ Undo';
+  const action = undoByPage.get(pageUndoKey());
+  button.disabled = !action || undoBusy;
+  button.title = action ? 'Undo on this page: ' + action.label : 'No reversible action on this page';
+  button.textContent = action ? '↶ Undo: ' + action.label : '↶ Undo';
 }
-function clearUndo() { lastUndo = null; updateUndoButton(); }
-function rememberUndo(label, rollback, group = null) {
-  if (group && lastUndo?.group === group) return;
-  lastUndo = { label, rollback, group, writerId: state.writer?.id || null, novelId: state.novel?.id || null };
+function clearUndo(scope = null) {
+  if (scope) undoByPage.delete(scope);
+  else undoByPage.clear();
+  updateUndoButton();
+}
+function rememberUndo(label, rollback, group = null, scope = pageUndoKey()) {
+  const old = undoByPage.get(scope);
+  if (group && old?.group === group) return;
+  undoByPage.set(scope, { label, rollback, group, scope });
   updateUndoButton();
 }
 async function undoLast() {
-  const action = lastUndo;
+  const scope = pageUndoKey(), action = undoByPage.get(scope);
   if (!action || undoBusy) return;
-  if ((action.writerId && action.writerId !== state.writer?.id) ||
-      (action.novelId && action.novelId !== state.novel?.id)) {
-    clearUndo(); toast('Undo is available only in the library where the change happened.',true); return;
-  }
   if (!(await flush())) { toast('Unable to undo until pending changes are saved.',true); return; }
   undoBusy = true; updateUndoButton();
   try {
     const ok = await action.rollback();
     if (ok === false) throw new Error('The USB update could not be completed.');
-    if (lastUndo === action) clearUndo();
+    if (undoByPage.get(scope) === action) undoByPage.delete(scope);
     toast('Undid: ' + action.label);
   } catch(error) {
     toast('Undo failed: ' + error.message + '. Check the USB files before retrying.',true);
-  } finally { undoBusy=false;updateUndoButton(); }
+  } finally { undoBusy = false; updateUndoButton(); }
+}
+function saveNavigation() {
+  if (pageType() === 'folder' || pageType() === 'writers') return;
+  try {
+    sessionStorage.setItem(NAV_KEY, JSON.stringify({
+      libraryCreatedAt: state.manifest?.createdAt || null,
+      writerId: state.writer?.id || null,
+      novelId: state.novel?.id || null,
+      characterId: state.active?.id || null,
+      view: pageType()
+    }));
+  } catch { /* Browser storage disabled: navigation works normally until refresh. */ }
+}
+function savedNavigation() {
+  try { return JSON.parse(sessionStorage.getItem(NAV_KEY) || 'null'); }
+  catch { return null; }
+}
+async function restoreNavigation(route) {
+  if (!route?.writerId || !state.manifest?.writers.some(w => w.id === route.writerId)) return;
+  if (route.libraryCreatedAt && state.manifest.createdAt !== route.libraryCreatedAt) return;
+  await chooseWriter(route.writerId);
+  if (!route.novelId || !state.novels.some(n => n.id === route.novelId)) return;
+  await chooseNovel(route.novelId);
+  if (route.view === 'tree') await showTree();
+  else if (route.view === 'editor' && state.characters.some(c => c.id === route.characterId)) await chooseCharacter(route.characterId);
+  else if (route.view === 'bookshelf') await showBookshelf();
+}
+async function refreshCurrentView() {
+  if (!state.root || undoBusy) return;
+  if (!(await flush())) { toast('Save failed. Refresh canceled so no unsaved changes are lost.',true); return; }
+  const refreshBtn = $('refreshViewBtn');
+  refreshBtn.disabled = true;
+  const page = pageType(), writerId = state.writer?.id, novelId = state.novel?.id, characterId = state.active?.id;
+  const oldScope = pageUndoKey();
+  try {
+    // Re-read the selected USB library rather than refreshing the entire website.
+    const manifest = await readJSON(await state.root.getFileHandle('character-archive-manifest.json'));
+    validateManifest(manifest);
+    state.manifest = manifest;
+    renderWriterCards();
+    if (page === 'writers') {
+      setStage('writer');
+    } else if (writerId && manifest.writers.some(w => w.id === writerId)) {
+      await chooseWriter(writerId);
+      if (page !== 'bookshelf' && novelId && state.novels.some(n => n.id === novelId)) {
+        await chooseNovel(novelId);
+        if (page === 'tree') await showTree();
+        else if (page === 'editor' && characterId && state.characters.some(c => c.id === characterId)) await chooseCharacter(characterId);
+      }
+    } else {
+      state.writer = null; state.writerDir = null; state.novels = []; clearNovelState();
+      setStage('writer');
+    }
+    // A fresh read may have changed the target files; a stale Undo must not overwrite them.
+    if (page === 'bookshelf') {
+      for (const key of undoByPage.keys()) if (key.includes('/' + writerId + '/')) undoByPage.delete(key);
+    } else if (novelId) {
+      for (const key of undoByPage.keys()) if (key.includes('/' + novelId + '/')) undoByPage.delete(key);
+    }
+    undoByPage.delete(oldScope);
+    updateUndoButton();
+    status('Current view refreshed from USB');
+    toast('Current view refreshed from USB. Undo for reloaded files was cleared.');
+  } catch (error) {
+    toast('Could not refresh this view: ' + error.message,true);
+  } finally { refreshBtn.disabled = false; }
 }
 function rememberFieldUndo(character,section,key,original,group,label) {
   rememberUndo(label || ('Edit '+ section + ' / ' + key), async () => {
@@ -171,6 +258,8 @@ function setStage(stage) {
   $('backupBtn').classList.toggle('hidden', !state.root);
   $('topSwitchWriterBtn').classList.toggle('hidden', stage !== 'workspace');
   $('changeFolderBtn').classList.toggle('hidden', !state.root);
+  $('refreshViewBtn').classList.toggle('hidden', stage !== 'workspace');
+  updateUndoButton();
 }
 function clearNovelState() {
   state.novel = null; state.novelDir = null; state.charsDir = null; state.portraitsDir = null;
@@ -286,6 +375,7 @@ async function selectFolder() {
       }
     }
     const { root, manifest, existing } = await resolveLibraryLocation(selected);
+    const routeToRestore = savedNavigation();
     clearRootState();
     state.root = root;
     state.selectedLocation = selected;
@@ -297,6 +387,7 @@ async function selectFolder() {
     renderWriterCards();
     setStage('writer');
     toast(existing ? 'Existing library opened: ' + root.name + '.' : 'Created the Character Bookshelf folder.');
+    if (routeToRestore) await restoreNavigation(routeToRestore);
   } catch (error) {
     if (error.name === 'AbortError') return;
     $('folderError').textContent = 'Cannot open folder: ' + error.message;
@@ -341,13 +432,12 @@ async function createWriter() {
       await putJSON(state.root,'character-archive-manifest.json',next);
       state.manifest=next;state.writer=null;state.writerDir=null;state.novels=[];clearNovelState();
       renderWriterCards();setStage('writer');return true;
-    });
+    }, null, pageUndoKey('writers'));
   } catch (error) { toast('Could not create writer: ' + error.message, true); }
 }
 async function chooseWriter(id) {
   if (!(await flush())) { toast('Save your changes before switching writers.', true); return; }
   const writer = state.manifest.writers.find(w => w.id === id);
-  if (state.writer?.id !== id) clearUndo();
   if (!writer) return;
   try {
     const directory = await state.root.getDirectoryHandle(writer.folder);
@@ -410,14 +500,13 @@ async function createNovel() {
       await state.writerDir.removeEntry(novel.folder);
       state.novels=state.novels.filter(x=>x.id!==novel.id);clearNovelState();
       renderNovelSelect();await showBookshelf();return true;
-    });
+    }, null, pageUndoKey('bookshelf'));
     toast('Novel created.');
   } catch (error) { toast('Could not create novel: ' + error.message, true); }
 }
 async function chooseNovel(id) {
   if (!(await flush())) { toast('Save your changes before switching novels.', true); renderNovelSelect(); return; }
   const novel = state.novels.find(n => n.id === id);
-  if (state.novel?.id !== id) clearUndo();
   if (!novel) return;
   try {
     const directory = await state.writerDir.getDirectoryHandle(novel.folder);
@@ -475,7 +564,7 @@ async function createCharacter() {
       state.characters=state.characters.filter(x=>x.id!==character.id);
       if(state.active?.id===character.id)state.active=null;
       await showCharacters();renderCharacterList();return true;
-    });
+    }, null, pageUndoKey('characters'));
     toast('Character created and saved to the selected folder.');
   } catch (error) { toast('Could not create character: ' + error.message, true); }
 }
@@ -599,6 +688,8 @@ async function showCharacters() {
 function setWorkspaceView(view) {
   $('workspace').classList.toggle('galleryMode', view !== 'editor');
   $('workspace').classList.toggle('editorMode', view === 'editor');
+  updateUndoButton();
+  saveNavigation();
 }
 function setActiveSidebarNavigation(view) {
   $('bookshelfBtn').classList.toggle('navSelected',view==='bookshelf');
@@ -1540,13 +1631,14 @@ async function exportDocx(scope) {
 
 function init() {
   $('undoBtn').onclick=()=>void undoLast();updateUndoButton();
+  $('refreshViewBtn').onclick=()=>void refreshCurrentView();
   $('selectFolderBtn').onclick = selectFolder;
   $('reselectFolderBtn').onclick = selectFolder;
   $('changeFolderBtn').onclick = selectFolder;
   $('newWriterBtn').onclick = createWriter;
   const switchWriter = async () => {
     if (!(await flush())) return;
-    clearUndo();state.writer = null; state.writerDir = null; state.novels = []; clearNovelState();
+    state.writer = null; state.writerDir = null; state.novels = []; clearNovelState();
     renderWriterCards(); setStage('writer'); status('Choose writer');
   };
   $('switchWriterBtn').onclick = switchWriter;
