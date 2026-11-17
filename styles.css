@@ -77,3 +77,53 @@
 .dangerConfirm{background:#af384d;color:#fff;border:1px solid #ce5a69;border-radius:8px;padding:10px 14px;font-weight:750}
 .dangerConfirm:hover{background:#c7485d}
 @media(max-width:750px){.bookTile{min-width:69px}.novelActions{gap:6px}.novelActions>*{font-size:12px;padding:8px 9px}}
+
+
+/* v3.3: Character Tree. The visual map is editable and stored next to this novel's files. */
+.treeView{max-width:1240px;margin:0 auto;animation:pageReveal .18s ease-out}
+.treeBreadcrumb{display:flex;gap:10px;align-items:center;color:#91a9c8;font-size:13px;margin:0 0 22px;flex-wrap:wrap}
+.treeHeading{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:19px}
+.treeHeading h1{font-size:clamp(28px,4vw,40px);margin:0 0 8px;letter-spacing:-.7px}
+.treeHeading p:not(.pageKicker){color:#a5bad2;margin:0;max-width:650px}
+.treeInstructions{display:flex;align-items:center;gap:9px;color:#b8c8da;font-size:12px;background:#152438;border:1px solid #304661;border-radius:10px 10px 0 0;padding:13px 16px;flex-wrap:wrap}
+.treeDot{width:9px;height:9px;flex:none;border-radius:50%;background:#8eb6e8;box-shadow:0 0 0 3px #8eb6e833}
+.treeSaveLabel{color:#8db4cc;margin-left:auto}
+.treeSaveLabel[data-kind=busy]{color:#e8ca8a}.treeSaveLabel[data-kind=bad]{color:#f6a2b1}
+.treeViewport{overflow:auto;min-height:330px;max-height:70vh;background-color:#101c2b;background-image:radial-gradient(#4c647a50 .7px,transparent .8px);background-size:19px 19px;border:1px solid #304661;border-top:0;border-radius:0 0 12px 12px;scrollbar-color:#415874 #111b29}
+.treeStage{position:relative;min-width:880px;min-height:320px;isolation:isolate}
+#treeLines{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:1}
+#treeNodes{position:absolute;inset:0;z-index:2;pointer-events:none}
+.treeNode{position:absolute;width:180px;min-height:94px;background:linear-gradient(155deg,#243b57,#172739);border:1px solid #6182a2;border-radius:12px;box-shadow:0 10px 25px #03070e80;pointer-events:auto;padding:9px;display:flex;flex-direction:column;gap:5px}
+.treeNode:focus-within{border-color:#a1cbff}
+.treeNodeHead{display:flex;align-items:center;justify-content:space-between;gap:5px}
+.treeNodeHandle{touch-action:none;user-select:none;cursor:grab;border:1px solid #465f78;background:#192d44;color:#b6cdeb;border-radius:6px;letter-spacing:2px;padding:3px 8px;font-size:12px}
+.treeNodeHandle:active{cursor:grabbing}
+.treeNodeRole{font-size:10px;color:#9fb4cc;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;max-width:110px}
+.treeNodeOpen{font-weight:750;font-size:15px;line-height:1.2;text-align:left;border:0;background:none;color:#ecf3ff;overflow-wrap:anywhere;padding:3px 2px}
+.treeNodeOpen:hover{text-decoration:underline;color:#b6d5ff}
+.treeNodeCaption{font-size:11px;color:#8fa9c2;margin:0 2px}
+.treeEdge{fill:none;stroke:#78a9d9;stroke-width:2.2;opacity:.85}
+.treeEdgeOther{stroke:#8b94aa;stroke-dasharray:7 6;opacity:.65}
+.treeEdgeLabel{fill:#bdd4ed;font-size:11px;font-weight:700;paint-order:stroke;stroke:#101c2b;stroke-width:6px;stroke-linejoin:round}
+.treeEditPanel{background:#142233;border:1px solid #2d4059;border-radius:13px;margin-top:22px;padding:20px}
+.treeEditTitle h2{margin:0 0 5px;font-size:18px}
+.treeEditTitle p{margin:0 0 15px;color:#a0b2c8;font-size:13px}
+.treeConnectionList{display:grid;gap:8px;margin-bottom:16px}
+.treeConnectionRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#192c40;border:1px solid #344b66;border-radius:9px;padding:10px}
+.treeConnectionNames{flex:1;min-width:210px;font-weight:700}
+.treeConnectionRow select{max-width:225px;min-width:150px}
+.treeRemoveBtn{background:transparent;border:1px solid #805368;border-radius:7px;color:#ffbdc8;padding:9px}
+.treeRemoveBtn:hover{background:#542b3d}
+.treeConnectForm{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;margin-top:12px;padding-top:17px;border-top:1px solid #2f435b}
+.treeConnectForm label{font-size:11px;color:#b4c7de;display:flex;flex-direction:column;gap:6px;font-weight:650}
+.treeConnectForm select{width:100%}
+.treeConnectForm button{white-space:nowrap}
+.treeFootnote{font-size:12px;line-height:1.65;color:#95acc8;margin:16px 0 0}
+.treeFootnote code{color:#e2c89a}
+.treeNavButton{padding:7px 11px;background:#244567;border:1px solid #5477a0;border-radius:8px;color:#e0efff;font-weight:700;font-size:12px}
+.treeNavButton:hover{background:#325c87}
+@media(max-width:850px){.treeConnectForm{grid-template-columns:1fr 1fr}.treeHeading{align-items:flex-start;flex-direction:column}.treeEditPanel{padding:14px}}
+@media(max-width:500px){.treeConnectForm{grid-template-columns:1fr}.treeConnectionRow select{width:100%;max-width:none}}
+
+/* Existing profile links can also be classified for the automatic Character Tree. */
+.relationshipRow select{flex:0 1 180px;min-width:145px;font-size:12px}

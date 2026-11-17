@@ -28,7 +28,7 @@ const state = {
   root: null, selectedLocation: null, manifest: null, writer: null, writerDir: null,
   novels: [], novel: null, novelDir: null, charsDir: null, portraitsDir: null,
   characters: [], active: null, saveTimer: null, saving: null,
-  revision: 0, savedRevision: 0, portraitUrl: null, galleryUrls: [], epoch: 0
+  revision: 0, savedRevision: 0, portraitUrl: null, galleryUrls: [], epoch: 0, treeMeta: null, treeRevision: 0, treeSavedRevision: 0, treeTimer: null, treeSaving: null
 };
 
 async function readJSON(handle) {
@@ -59,7 +59,7 @@ function queueSave() {
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(() => { void flush(); }, 700);
 }
-async function flush() {
+async function flushProfile() {
   clearTimeout(state.saveTimer);
   state.saveTimer = null;
   if (state.saving) return state.saving;
@@ -95,6 +95,11 @@ async function flush() {
   try { return await state.saving; }
   finally { state.saving = null; }
 }
+async function flush() {
+  const profileOk = await flushProfile();
+  if (!profileOk) return false;
+  return flushTree();
+}
 function setStage(stage) {
   $('startup').classList.toggle('hidden', stage === 'workspace');
   $('folderStep').classList.toggle('hidden', stage !== 'folder');
@@ -108,6 +113,8 @@ function clearNovelState() {
   state.novel = null; state.novelDir = null; state.charsDir = null; state.portraitsDir = null;
   state.characters = []; state.active = null; state.revision = 0; state.savedRevision = 0;
   state.epoch++;
+  clearTimeout(state.treeTimer); state.treeTimer=null; state.treeMeta=null;
+  state.treeRevision=0; state.treeSavedRevision=0; state.treeSaving=null;
   cleanPortraitUrl(); cleanGalleryUrls();
 }
 function clearRootState() {
@@ -202,7 +209,7 @@ async function selectFolder() {
     $('folderError').classList.remove('hidden');
     return;
   }
-  if (hasUnsaved() || state.saving) {
+  if (hasUnsaved() || state.saving || treeUnsaved() || state.treeSaving) {
     toast('Finish saving before changing folders. Click Select folder again after it says Saved.', true);
     void flush();
     return;
@@ -321,6 +328,7 @@ async function chooseNovel(id) {
     const directory = await state.writerDir.getDirectoryHandle(novel.folder);
     const charsDir = await directory.getDirectoryHandle('characters', { create: true });
     const portraitsDir = await directory.getDirectoryHandle('portraits', { create: true });
+    const treeMeta = await loadTreeMeta(directory);
     const characters = [];
     for await (const [filename, handle] of charsDir.entries()) {
       if (handle.kind !== 'file' || !filename.toLowerCase().endsWith('.json')) continue;
@@ -335,6 +343,7 @@ async function chooseNovel(id) {
     clearNovelState();
     state.novel = novel; state.novelDir = directory; state.charsDir = charsDir; state.portraitsDir = portraitsDir;
     state.characters = characters.sort((a,b) => a.name.localeCompare(b.name));
+    state.treeMeta = treeMeta;
     renderNovelSelect(); renderCharacterList();
     await showCharacters();
     status('Library ready');
@@ -384,7 +393,7 @@ function renderCharacterList() {
   $('newCharacterBtn').disabled = !state.novel;
 }
 function hideMainViews() {
-  for (const id of ['bookshelfView', 'novelView', 'emptyView', 'editor']) $(id).classList.add('hidden');
+  for (const id of ['bookshelfView', 'novelView', 'treeView', 'emptyView', 'editor']) $(id).classList.add('hidden');
 }
 function cleanGalleryUrls() {
   for (const url of state.galleryUrls) URL.revokeObjectURL(url);
@@ -593,6 +602,11 @@ function renderRelationships(host, character) {
     const jump = el('button','linkButton', target.name); jump.type = 'button'; jump.onclick = () => void chooseCharacter(target.id); row.append(jump);
     const own = character.relationships.links.find(x => x.id === link.id);
     if (own) {
+      const kind = el('select');
+      kind.setAttribute('aria-label', 'Relationship type with ' + target.name);
+      addTypes(kind, own.type);
+      kind.addEventListener('change', () => { own.type = kind.value; queueSave(); });
+      row.append(kind);
       const notes = el('textarea'); notes.placeholder = 'Notes from this character’s perspective…'; notes.value = own.notes || '';
       notes.addEventListener('input', () => { own.notes = notes.value; queueSave(); });
       row.append(notes);
@@ -699,6 +713,7 @@ async function deleteCharacter(id) {
     await state.charsDir.removeEntry(character._filename);
     // Only after the character file is removed should the UI forget this character.
     state.characters = state.characters.filter(c => c.id !== character.id);
+    if (state.treeMeta?.positions?.[character.id]) { delete state.treeMeta.positions[character.id]; queueTreeSave(); }
     if (state.active?.id === character.id) {
       state.active = null;
       state.revision = state.savedRevision = 0;
@@ -801,6 +816,297 @@ async function copyFolder(source, dest) {
     }
   }
 }
+/* v3.3 Character Tree: derives connections from saved character relationships.
+   Only manual node positions live in character-tree.json; character metadata remains
+   in the existing per-character JSON. Unknown relationships are NOT guessed. */
+const TREE_TYPES = [
+  ['connected', 'Connected (unspecified)'],
+  ['parent', 'Parent of →'],
+  ['child', 'Child of →'],
+  ['sibling', 'Sibling of'],
+  ['partner', 'Partner / spouse of'],
+  ['friend', 'Friend of'],
+  ['rival', 'Rival / enemy of'],
+  ['other', 'Other relationship']
+];
+const treeTypeName = type => TREE_TYPES.find(([id]) => id === type)?.[1] || TREE_TYPES[0][1];
+const treeType = value => TREE_TYPES.some(([id]) => id === value) ? value : 'connected';
+const treeMetaBlank = () => ({type:'character-bookshelf-tree',version:1,positions:{}});
+async function loadTreeMeta(directory) {
+  try {
+    const data = await readJSON(await directory.getFileHandle('character-tree.json'));
+    if (data?.type !== 'character-bookshelf-tree' || !data.positions || Array.isArray(data.positions))
+      throw new Error('Invalid character-tree.json — leaving existing files untouched.');
+    return data;
+  } catch (error) {
+    if (error.name === 'NotFoundError') return treeMetaBlank();
+    throw error;
+  }
+}
+function treeUnsaved() { return state.treeRevision > state.treeSavedRevision; }
+function queueTreeSave() {
+  if (!state.novelDir || !state.treeMeta) return;
+  state.treeRevision++;
+  $('treeSaveLabel').textContent = 'Unsaved layout changes';
+  $('treeSaveLabel').dataset.kind = 'busy';
+  clearTimeout(state.treeTimer);
+  state.treeTimer = setTimeout(() => { void flushTree(); }, 450);
+}
+async function flushTree() {
+  clearTimeout(state.treeTimer); state.treeTimer = null;
+  if (state.treeSaving) return state.treeSaving;
+  if (!treeUnsaved() || !state.novelDir) return true;
+  const dir = state.novelDir, meta = state.treeMeta;
+  state.treeSaving = (async () => {
+    while (treeUnsaved()) {
+      const revision = state.treeRevision;
+      try {
+        $('treeSaveLabel').textContent = 'Saving layout…';
+        $('treeSaveLabel').dataset.kind = 'busy';
+        await putJSON(dir,'character-tree.json',{...meta,updatedAt:dateNow()});
+        state.treeSavedRevision = revision;
+      } catch (error) {
+        $('treeSaveLabel').textContent = 'Layout save failed — retry before leaving';
+        $('treeSaveLabel').dataset.kind = 'bad';
+        status('Tree save failed', 'bad');
+        toast('Could not save tree positions: ' + error.message + '. Keep this page open and retry.', true);
+        return false;
+      }
+    }
+    $('treeSaveLabel').textContent = 'Layout saved to USB';
+    $('treeSaveLabel').dataset.kind = '';
+    status('Saved to folder');
+    return true;
+  })();
+  try { return await state.treeSaving; }
+  finally { state.treeSaving = null; }
+}
+// Each pair of characters is one connection, even when both profiles link each other.
+function treeConnections() {
+  const pairs = new Map(), valid = new Set(state.characters.map(c => c.id));
+  for (const source of state.characters) for (const link of source.relationships?.links || []) {
+    if (!link?.id || link.id === source.id || !valid.has(link.id)) continue;
+    const key = [source.id,link.id].sort().join('|');
+    const candidate = {key,from:source.id,to:link.id,type:treeType(link.type)};
+    const previous = pairs.get(key);
+    if (!previous || (previous.type === 'connected' && candidate.type !== 'connected')) pairs.set(key,candidate);
+  }
+  return [...pairs.values()];
+}
+function treeLayout(connections) {
+  const chars=state.characters;
+  const groupParent=new Map(chars.map(c=>[c.id,c.id]));
+  const find=id=>{let p=groupParent.get(id);while(p && p!==groupParent.get(p)){p=groupParent.get(p);}return p || id;};
+  const unite=(a,b)=>{const x=find(a),y=find(b);if(x!==y)groupParent.set(y,x);};
+  for(const e of connections)if(['partner','sibling'].includes(e.type))unite(e.from,e.to);
+  const groups=new Map(); for(const c of chars){const g=find(c.id);if(!groups.has(g))groups.set(g,[]);groups.get(g).push(c);}
+  const levels=new Map([...groups.keys()].map(x=>[x,0]));
+  const hier=[];
+  for(const e of connections){
+    let from=e.from,to=e.to;
+    if(e.type==='child') [from,to]=[to,from];
+    if(e.type!=='parent' && e.type!=='child')continue;
+    from=find(from);to=find(to);if(from!==to)hier.push({from,to});
+  }
+  // Relax parent-child ranks, with a guard against inconsistent cycles.
+  for(let pass=0;pass<groups.size;pass++){
+    let changed=false;
+    for(const e of hier){const next=(levels.get(e.from)||0)+1;
+      if(next>(levels.get(e.to)||0) && next<groups.size+1){levels.set(e.to,next);changed=true;}}
+    if(!changed)break;
+  }
+  const ordered=[...groups.entries()].sort((a,b)=>{
+    const delta=(levels.get(a[0])||0)-(levels.get(b[0])||0);
+    return delta || a[1][0].name.localeCompare(b[1][0].name);
+  });
+  const rankMembers=new Map();
+  for(const [gid,members] of ordered){const rank=levels.get(gid)||0;
+    if(!rankMembers.has(rank))rankMembers.set(rank,[]);
+    rankMembers.get(rank).push(...members.sort((a,b)=>a.name.localeCompare(b.name)));
+  }
+  const positions={};let y=65;
+  for(const [rank,members] of [...rankMembers.entries()].sort((a,b)=>a[0]-b[0])){
+    let maxRow=0;
+    members.forEach((c,i)=>{const row=Math.floor(i/5),col=i%5;
+      positions[c.id]={x:70+col*220,y:y+row*153};maxRow=Math.max(maxRow,row);});
+    y+=(maxRow+1)*153+75;
+  }
+  return positions;
+}
+function treePositions(connections) {
+  const auto=treeLayout(connections), out={};
+  for(const c of state.characters){
+    const pos=state.treeMeta?.positions?.[c.id];
+    out[c.id]=pos && Number.isFinite(pos.x) && Number.isFinite(pos.y) ?
+      {x:Math.max(10,pos.x),y:Math.max(12,pos.y)} : auto[c.id];
+  }
+  return out;
+}
+const svgEl = name => document.createElementNS('http://www.w3.org/2000/svg',name);
+function drawTreeLines(connections, positions, width, height) {
+  const svg=$('treeLines');svg.replaceChildren();
+  svg.setAttribute('width',width);svg.setAttribute('height',height);
+  svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+  for(const c of connections){
+    const a=positions[c.from],b=positions[c.to];if(!a||!b)continue;
+    const ax=a.x+90,ay=a.y+48,bx=b.x+90,by=b.y+48;
+    const isHierarchy=['parent','child'].includes(c.type);
+    const upper=(c.type==='child')?b:a,lower=(c.type==='child')?a:b;
+    const startX=isHierarchy?upper.x+90:ax,startY=isHierarchy?upper.y+94:ay;
+    const endX=isHierarchy?lower.x+90:bx,endY=isHierarchy?lower.y:by;
+    const midY=(startY+endY)/2;
+    const path=svgEl('path');
+    path.setAttribute('d',isHierarchy && endY>startY
+      ?`M ${startX} ${startY} V ${midY} H ${endX} V ${endY}`
+      :`M ${startX} ${startY} C ${startX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`);
+    path.setAttribute('class','treeEdge'+(c.type==='connected'?' treeEdgeOther':''));
+    svg.append(path);
+    const text=svgEl('text');text.setAttribute('class','treeEdgeLabel');
+    text.setAttribute('x',(startX+endX)/2);text.setAttribute('y',midY-9);
+    text.setAttribute('text-anchor','middle');text.textContent=c.type==='connected'?'linked':c.type;
+    svg.append(text);
+  }
+}
+function addTypes(select,selected='connected') {
+  for(const [value,label] of TREE_TYPES) select.add(new Option(label,value));
+  select.value=treeType(selected);
+}
+async function persistTreeLink(source,oldLinks) {
+  try {
+    const updated={...source,updatedAt:dateNow()};
+    await writeHandle(source._handle,JSON.stringify(diskProfile(updated),null,2)+'\n');
+    source.updatedAt=updated.updatedAt;
+    status('Saved to folder');
+    return true;
+  } catch(error){
+    source.relationships.links=oldLinks;
+    status('Relationship save failed','bad');
+    toast('Could not save relationship to USB: '+error.message,true);
+    return false;
+  }
+}
+async function setTreeConnectionType(edge,type) {
+  if(!(await flush()))return;
+  const source=state.characters.find(c=>c.id===edge.from);
+  const target=state.characters.find(c=>c.id===edge.to);
+  if(!source||!target)return;
+  // The selected displayed direction corresponds to its originating profile.
+  source.relationships ??={links:[],notes:''};source.relationships.links??=[];
+  const old=structuredClone(source.relationships.links);
+  const link=source.relationships.links.find(x=>x.id===target.id);
+  if(link)link.type=type;
+  else source.relationships.links.push({id:target.id,notes:'',type});
+  if(await persistTreeLink(source,old))renderTree();
+}
+async function addTreeConnection() {
+  const from=$('treeFrom').value,to=$('treeTo').value,type=$('treeNewType').value;
+  if(!from||!to||from===to){toast('Select two different characters.',true);return;}
+  if(treeConnections().some(e=>[e.from,e.to].sort().join('|')===[from,to].sort().join('|'))){
+    toast('These characters are already linked. Edit their existing connection below.',true);return;
+  }
+  const source=state.characters.find(c=>c.id===from);
+  if(!source||!(await flush()))return;
+  source.relationships??={links:[],notes:''};source.relationships.links??=[];
+  const old=structuredClone(source.relationships.links);
+  source.relationships.links.push({id:to,notes:'',type});
+  if(await persistTreeLink(source,old))renderTree();
+}
+async function removeTreeConnection(edge){
+  const a=state.characters.find(c=>c.id===edge.from),b=state.characters.find(c=>c.id===edge.to);
+  if(!a||!b)return;
+  if(!confirm(`Remove the connection between ${a.name} and ${b.name}? Their profiles will remain.`))return;
+  if(!(await flush()))return;
+  const changed=[a,b].filter(c=>(c.relationships?.links||[]).some(x=>x.id===(c===a?b.id:a.id)));
+  for(const c of changed){
+    const old=structuredClone(c.relationships.links), other=c===a?b:a;
+    c.relationships.links=c.relationships.links.filter(x=>x.id!==other.id);
+    if(!(await persistTreeLink(c,old))){
+      toast('The connection was only partially changed. Reopen the novel to inspect both profiles.',true);
+      break;
+    }
+  }
+  renderTree();
+}
+function renderTree() {
+  if(!state.novel)return;
+  const edges=treeConnections(),positions=treePositions(edges),container=$('treeNodes');
+  container.replaceChildren();
+  const width=Math.max(940,...Object.values(positions).map(p=>Math.ceil(p.x+230)));
+  const height=Math.max(340,...Object.values(positions).map(p=>Math.ceil(p.y+175)));
+  $('treeStage').style.width=width+'px';$('treeStage').style.height=height+'px';
+  drawTreeLines(edges,positions,width,height);
+  for(const character of state.characters){
+    const p=positions[character.id];
+    const card=el('div','treeNode');card.style.left=p.x+'px';card.style.top=p.y+'px';
+    const head=el('div','treeNodeHead');
+    const role=el('span','treeNodeRole',character.story?.role||'Character');
+    const drag=el('button','treeNodeHandle','⠿');drag.type='button';
+    drag.title='Drag to reposition '+character.name;
+    drag.setAttribute('aria-label','Drag to reposition '+character.name);
+    head.append(role,drag);
+    const open=el('button','treeNodeOpen',character.name);open.type='button';
+    open.addEventListener('click',()=>void chooseCharacter(character.id));
+    card.append(head,open,el('span','treeNodeCaption','Open profile ↗'));
+    container.append(card);
+    drag.addEventListener('pointerdown',event=>{
+      if(event.button!==0)return;
+      event.preventDefault();drag.setPointerCapture(event.pointerId);
+      const startX=event.clientX,startY=event.clientY,original={...positions[character.id]};
+      const move=e=>{
+        if(e.pointerId!==event.pointerId)return;
+        positions[character.id]={x:Math.max(10,original.x+e.clientX-startX),y:Math.max(12,original.y+e.clientY-startY)};
+        const next=positions[character.id];card.style.left=next.x+'px';card.style.top=next.y+'px';
+        drawTreeLines(edges,positions,width,height);
+      };
+      const finish=e=>{
+        if(e.pointerId!==event.pointerId)return;
+        drag.removeEventListener('pointermove',move);
+        drag.removeEventListener('pointerup',finish);
+        drag.removeEventListener('pointercancel',finish);
+        const next=positions[character.id];
+        if(next.x!==original.x||next.y!==original.y){
+          state.treeMeta.positions[character.id]=next;queueTreeSave();
+        }
+      };
+      drag.addEventListener('pointermove',move);drag.addEventListener('pointerup',finish);drag.addEventListener('pointercancel',finish);
+    });
+  }
+  const list=$('treeConnectionList');list.replaceChildren();
+  if(!edges.length)list.append(el('p','muted','No connections yet. All characters are shown above. You can connect them using the controls below or their profile relationships.'));
+  for(const edge of edges){
+    const a=state.characters.find(x=>x.id===edge.from),b=state.characters.find(x=>x.id===edge.to);
+    const row=el('div','treeConnectionRow');
+    row.append(el('span','treeConnectionNames',`${a.name} → ${b.name}`));
+    const select=el('select');select.setAttribute('aria-label',`Relationship between ${a.name} and ${b.name}`);
+    addTypes(select,edge.type);select.addEventListener('change',()=>void setTreeConnectionType(edge,select.value));
+    const remove=el('button','treeRemoveBtn','Remove link');remove.type='button';
+    remove.addEventListener('click',()=>void removeTreeConnection(edge));
+    row.append(select,remove);list.append(row);
+  }
+  for(const id of ['treeFrom','treeTo']){
+    const select=$(id),prev=select.value;select.replaceChildren(new Option('Choose character…',''));
+    for(const c of state.characters)select.add(new Option(c.name,c.id));
+    if(state.characters.some(c=>c.id===prev))select.value=prev;
+  }
+  $('treeNewType').replaceChildren();addTypes($('treeNewType'));
+  $('treeConnectBtn').disabled=state.characters.length<2;
+}
+async function showTree() {
+  if(!(await flush())){toast('Save your changes before opening the tree.',true);return;}
+  if(!state.novel){await showBookshelf();return;}
+  hideMainViews();cleanGalleryUrls();
+  $('treeView').classList.remove('hidden');
+  $('treeViewTitle').textContent=state.novel.name+' · Character Tree';
+  $('treeSaveLabel').textContent=treeUnsaved()?'Unsaved layout changes':'Layout ready';
+  $('treeSaveLabel').dataset.kind=treeUnsaved()?'busy':'';
+  setActiveSidebarNavigation('');setWorkspaceView('tree');
+  renderTree();
+}
+async function resetTreeLayout() {
+  if(!state.novel || !confirm('Reset all manually arranged tree positions for this novel? Character profiles and connections will remain unchanged.'))return;
+  state.treeMeta.positions={};queueTreeSave();renderTree();
+}
+
 /* Character export tools. No external libraries or network APIs.
    PDF uses the browser's Print > Save as PDF. Word is a genuine .docx ZIP package. */
 function safeHtml(value) {
@@ -1020,6 +1326,13 @@ function init() {
   $('novelCharactersBtn').onclick = () => void showCharacters();
   $('novelBackToShelfBtn').onclick = () => void showBookshelf();
   $('novelViewNewCharacterBtn').onclick = createCharacter;
+  $('novelTreeBtn').onclick = () => void showTree();
+  $('treeShelfBtn').onclick = () => void showBookshelf();
+  $('treeCharactersBtn').onclick = () => void showCharacters();
+  $('treeAutoLayoutBtn').onclick = () => void resetTreeLayout();
+  $('treeConnectBtn').onclick = () => void addTreeConnection();
+  $('editorTreeBtn').onclick = () => void showTree();
+  $('profileTreeBtn').onclick = () => void showTree();
   $('novelViewDeleteBookBtn').onclick = () => { if (state.novel) void deleteBook(state.novel.id); };
   $('profileShelfBtn').onclick = () => void showBookshelf();
   $('profileNovelBtn').onclick = () => void showCharacters();
@@ -1050,7 +1363,7 @@ function init() {
   $('exportPdfNovelBtn').onclick = () => void exportPdf('novel');
   $('exportDocxNovelBtn').onclick = () => void exportDocx('novel');
   window.addEventListener('beforeunload', event => {
-    if (hasUnsaved() || !!state.saving) { event.preventDefault(); event.returnValue = ''; }
+    if (hasUnsaved() || !!state.saving || treeUnsaved() || !!state.treeSaving) { event.preventDefault(); event.returnValue = ''; }
   });
   setStage('folder');
 }

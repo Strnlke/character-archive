@@ -1,24 +1,33 @@
-# Character Bookshelf v3.2 — Delete with confirmation
+# Character Bookshelf v3.3 — Character Tree
 
-This update adds **Delete book** (on bookshelves and inside a novel) and **Delete character** (on the character gallery and profile editor). Both actions show an **“Are you sure?”** warning with a separate **Cancel** button, and do nothing unless explicitly confirmed.
+This version adds a visual **Character Tree** to each novel while retaining the dark bookshelf interface, per-writer folders, individual character JSON files, USB selection, deletion confirmations, and PDF/Word character exports.
 
-## IMPORTANT: Before upgrading
+## What's new
 
-1. **Back up your USB library** to a second location first. Deleting a book permanently removes its entire novel folder, including all characters, portraits, notes, and other files inside it. Deleting a character removes that character's JSON profile and its portrait if available.
-2. Extract this ZIP. Upload and replace `index.html`, `app.js`, `styles.css` in your existing GitHub Pages repository (such as `usb-test`). Commit the files. You can upload this README too.
-3. Refresh with Ctrl+Shift+R. Select your existing USB library as normal. **No data migration or renaming is needed.**
-4. **Try deletions with a test book and test character first**, not important writing data. The browser has to be able to delete files from your chosen USB folder.
+- **All Characters → Character Tree** navigation button. The tree has links back to **All Characters** and **Bookshelf**; a character's editor also has a **Character Tree** breadcrumb and sidebar button.
+- Every character appears automatically, including characters without relationships. Existing linked character pairs appear automatically as connections. **No family relationship is guessed:** old untyped links are labeled *Connected (unspecified)* until you classify them.
+- In **Edit connections**, add/remove links, and set the type: Connected, Parent of, Child of, Sibling, Partner/Spouse, Friend, Rival/Enemy, or Other. The type is stored in the character's existing `relationships.links` JSON, and also appears in the character profile editor.
+- Parent/child generations and sibling/partner grouping influence the automatic layout. **Drag by a card's handle** to arrange the tree manually. Positions are saved in a small per-novel `character-tree.json`. **Automatic layout** resets those manual positions after confirmation.
+- All connection and layout editing happens in the browser. There are **no new accounts, remote APIs, or storage dependencies**.
 
-## How to delete
+## Updating your working website
 
-- **Book:** Use the little × in a book cover's upper-right corner on the bookshelf, or **Delete book** on the novel's All Characters page. The warning says that all files inside that book's folder will be removed.
-- **Character:** Use the × on a character card in All Characters, or **Delete character** in the profile editor. The warning names the character and explains that its profile and portrait will be removed.
-- **Cancel, Esc, or closing the dialog:** Nothing is deleted.
+1. **Back up your USB writing library** (a separate USB drive is ideal) before upgrading. The version snapshot ZIP contains application files, **not** a copy of your personal writing data.
+2. Extract this ZIP and upload/replace `index.html`, `app.js`, and `styles.css` **together** in the GitHub Pages repository that currently hosts your Character Bookshelf (not just the HTML file).
+3. Commit, confirm GitHub Pages finished deploying, and refresh with Ctrl+Shift+R.
+4. Reconnect the folder you normally use. Open a **test novel** and use **Character Tree** on the All Characters page.
+5. Add two sample characters, link them, set a relationship type, drag a card, wait for **Layout saved to USB**, then close/reopen the site and select the same folder to verify persistence.
 
-If file deletion fails, the app reports failure rather than claiming success. A failed **recursive book deletion** can leave a partially deleted folder if USB access is interrupted; inspect the folder before retrying. USB file deletions generally bypass the Recycle Bin.
+## Storage & compatibility
 
-This version preserves the existing folder structure (including legacy `Character Archive` folders), writer profiles, novels, profile schemas, auto-save, navigation, and PDF/Word exports. Links to deleted characters in other profile JSON files may remain as invisible references; those files are not rewritten by deletion.
+The existing manifest, novel folders, writer folders, portrait files, and all character JSON files remain in place. No migration or renaming is needed. The only new file is `character-tree.json`, created **inside that novel's existing folder** when a manual node position is saved or reset. Type edits/additions/removals update the relevant character's JSON file immediately. Connections shown without a type are never assumed to be family relationships.
 
-## Verification
+Removing connections edits profile links, not characters. If a pair of characters was linked in both directions, their two JSON files may require separate writes; an interrupted USB connection could cause a partial update. In that case, reopen the novel and inspect both profiles before retrying. A character is never automatically deleted when removing a connection.
 
-Automated Chromium tests cover confirmation and cancellation, removal of character files/portraits and entire novel folders, preservation of other writers and novels, reloading from USB-like storage, and failure reporting. This build must still be verified on an actual USB flash drive in Chrome/Edge.
+## Tests performed
+
+Static JavaScript check and automated Chromium **mocked USB folder** tests covered: writer/novel/character creation; automatic display of all characters; connection creation, type changes, cancellation of removal, confirmed removal; manual drag and layout-save file creation; resetting layout; reopening a mock library and recovering the tree. The visual preview was captured from Chromium. **Real flash-drive testing of v3.3 has not yet been completed.**
+
+## Version snapshots
+
+Separate snapshot archive contains the exact prior v3.2 ZIP and this v3.3 release, plus screenshots and a change log. Save future release ZIP files together so you can restore a known-working version without affecting the USB writing data.

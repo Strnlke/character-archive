@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1018">
-  <title>Character Bookshelf · Bookshelf</title>
+  <title>Character Bookshelf</title>
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
@@ -48,6 +48,7 @@
         <div class="sidebarBlock">
           <div class="eyebrow">CHARACTER PROFILE</div>
           <button class="sideButton" id="editorBackCharactersBtn" type="button">← All characters</button>
+          <button class="sideButton" id="editorTreeBtn" type="button">♧ Character tree</button>
           <button class="sideButton" id="editorBackBookshelfBtn" type="button">▤ Bookshelf</button>
         </div>
         <div class="sidebarBlock">
@@ -113,8 +114,36 @@
             <button id="novelViewNewCharacterBtn" class="primary" type="button">＋ New character</button>
           </div>
         </div>
-        <div class="collectionHeading"><h2>Characters</h2><span id="novelCharacterCount" class="count">0</span><div class="spacer"></div><button id="exportPdfNovelBtn" class="quiet" type="button">↓ Export PDF</button><button id="exportDocxNovelBtn" class="quiet" type="button">↓ Export Word</button></div>
+        <div class="collectionHeading"><h2>Characters</h2><button id="novelTreeBtn" class="treeNavButton" type="button">♧ Character tree</button><span id="novelCharacterCount" class="count">0</span><div class="spacer"></div><button id="exportPdfNovelBtn" class="quiet" type="button">↓ Export PDF</button><button id="exportDocxNovelBtn" class="quiet" type="button">↓ Export Word</button></div>
         <div id="characterGallery" class="characterGallery"></div>
+      </section>
+      <section id="treeView" class="treeView hidden" aria-labelledby="treeViewTitle">
+        <div class="treeBreadcrumb">
+          <button id="treeShelfBtn" class="textButton" type="button">Bookshelf</button>
+          <span class="navSep">/</span>
+          <button id="treeCharactersBtn" class="textButton" type="button">All characters</button>
+          <span class="navSep">/</span><span>Character tree</span>
+        </div>
+        <div class="treeHeading">
+          <div><p class="pageKicker">RELATIONSHIPS · VISUAL MAP</p><h1 id="treeViewTitle">Character Tree</h1>
+            <p id="treeIntro">All characters appear automatically. Connect them through their relationship profiles, then arrange them here.</p></div>
+          <button id="treeAutoLayoutBtn" class="quiet" type="button">↻ Automatic layout</button>
+        </div>
+        <div class="treeInstructions"><span class="treeDot"></span><span>Drag a card by its handle to reposition it. Click its name to open the profile.</span><span id="treeSaveLabel" class="treeSaveLabel">Layout ready</span></div>
+        <div id="treeViewport" class="treeViewport" tabindex="0" aria-label="Scrollable character relationship tree">
+          <div id="treeStage" class="treeStage"><svg id="treeLines" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg><div id="treeNodes"></div></div>
+        </div>
+        <div class="treeEditPanel">
+          <div class="treeEditTitle"><div><h2>Edit connections</h2><p>Connections from the character profiles appear automatically. Set what they mean here, or add and remove connections.</p></div></div>
+          <div id="treeConnectionList" class="treeConnectionList"></div>
+          <div class="treeConnectForm">
+            <label>From character<select id="treeFrom"></select></label>
+            <label>To character<select id="treeTo"></select></label>
+            <label>Relationship<select id="treeNewType"></select></label>
+            <button id="treeConnectBtn" class="primary" type="button">+ Add connection</button>
+          </div>
+          <p class="treeFootnote">For directional relationships, “parent of” means the first character is the parent of the second. Relationships and notes stay in the characters’ USB JSON files; dragged positions are saved separately in this novel’s <code>character-tree.json</code>.</p>
+        </div>
       </section>
       <div id="emptyView" class="emptyView">
         <div class="bigGlyph">✦</div>
@@ -129,6 +158,8 @@
           <span id="profileBookName" class="navBook">Novel</span>
           <span class="navSep">/</span>
           <button id="profileNovelBtn" class="textButton" type="button">All characters</button>
+          <span class="navSep">/</span>
+          <button id="profileTreeBtn" class="textButton" type="button">Character tree</button>
           <span class="navSep">/</span>
           <span id="profileNavName" class="navNow">Character</span>
         </div>
