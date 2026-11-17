@@ -127,3 +127,27 @@
 
 /* Existing profile links can also be classified for the automatic Character Tree. */
 .relationshipRow select{flex:0 1 180px;min-width:145px;font-size:12px}
+
+/* v3.4 — visible connections, multi-target linking, drag-to-link, and Undo */
+.undoTopButton{background:#1e344c;border:1px solid #6284a8;color:#e6f1fe;border-radius:8px;padding:9px 13px;font-weight:750;white-space:nowrap}
+.undoTopButton:not(:disabled):hover{background:#2c4b6e}
+.undoTopButton:disabled{opacity:.40;cursor:not-allowed}
+.treeEdgeGlow{fill:none;stroke:#2f80c6;stroke-width:7;opacity:.27;stroke-linecap:round;stroke-linejoin:round}
+.treeEdge{fill:none;stroke:#a9d6ff;stroke-width:3.25;opacity:1;stroke-linecap:round;stroke-linejoin:round}
+.treeEdgeOther{stroke:#d4c5a9;stroke-dasharray:9 6;opacity:.92}
+.treeEdgeLabelBacking{fill:#132237;stroke:#4c6f94;stroke-width:1}
+.treeEdgeLabel{fill:#f0f8ff;font-size:12px;font-weight:800;paint-order:normal;stroke:none}
+.treeNode.linkTarget{border-color:#b9eeb5;box-shadow:0 0 0 3px #97d99a55,0 10px 25px #03070e80}
+.treeConnectForm{grid-template-columns:minmax(160px,1fr) minmax(220px,1.8fr) minmax(160px,1fr) auto}
+.treeTargetsField{padding:0;margin:0;border:0;min-width:0}
+.treeTargetsField legend{font-size:11px;color:#b4c7de;font-weight:650;padding:0 0 6px}
+.treeTargets{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));align-content:start;gap:5px;max-height:175px;overflow:auto;border:1px solid #3a526e;background:#0f1c2c;border-radius:8px;padding:8px}
+.treeTargetOption{display:flex!important;flex-direction:row!important;align-items:center;gap:7px;font-size:12px!important;color:#e0ecfb!important;cursor:pointer;font-weight:500!important;line-height:1.45}
+.treeTargetOption input{width:15px;height:15px;margin:0;accent-color:#77a7e4;flex:none}
+.treeDropDialog{width:min(94vw,510px)}
+.treeDropDialog .dialogBody{padding:24px}
+.treeDropDialog p{color:#aebfd2;line-height:1.55}
+.treeDropDialog label{display:block;margin-bottom:8px;font-size:12px;font-weight:700}
+.treeDropDialog select{width:100%}
+@media(max-width:850px){.treeConnectForm{grid-template-columns:1fr 1fr}}
+@media(max-width:550px){.treeConnectForm{grid-template-columns:1fr}.undoTopButton{padding:8px 10px}}

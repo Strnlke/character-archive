@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1018">
   <title>Character Bookshelf</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <link rel="stylesheet" href="styles.css?v=3.4">
+  <script src="app.js?v=3.4" defer></script>
 </head>
 <body>
   <header class="topbar">
     <div class="brand"><span class="brand-icon">✦</span><div><strong>Character Bookshelf</strong><small>Your writing library</small></div></div>
     <div class="topactions">
       <span id="saveStatus" class="status" role="status" aria-live="polite">No folder selected</span>
+      <button id="undoBtn" type="button" class="undoTopButton" disabled title="Undo the last reversible action in this library">↶ Undo</button>
       <button id="retrySaveBtn" class="warning hidden" type="button">Retry save</button>
       <button id="downloadUnsavedBtn" class="quiet hidden" type="button">Download unsaved profile</button>
       <button id="topSwitchWriterBtn" class="quiet hidden" type="button">⇄ Switch writer</button>
@@ -129,7 +130,7 @@
             <p id="treeIntro">All characters appear automatically. Connect them through their relationship profiles, then arrange them here.</p></div>
           <button id="treeAutoLayoutBtn" class="quiet" type="button">↻ Automatic layout</button>
         </div>
-        <div class="treeInstructions"><span class="treeDot"></span><span>Drag a card by its handle to reposition it. Click its name to open the profile.</span><span id="treeSaveLabel" class="treeSaveLabel">Layout ready</span></div>
+        <div class="treeInstructions"><span class="treeDot"></span><span>Drag to move; drop a card onto another card to link them. Click a name to open its profile.</span><span id="treeSaveLabel" class="treeSaveLabel">Layout ready</span></div>
         <div id="treeViewport" class="treeViewport" tabindex="0" aria-label="Scrollable character relationship tree">
           <div id="treeStage" class="treeStage"><svg id="treeLines" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg><div id="treeNodes"></div></div>
         </div>
@@ -138,11 +139,11 @@
           <div id="treeConnectionList" class="treeConnectionList"></div>
           <div class="treeConnectForm">
             <label>From character<select id="treeFrom"></select></label>
-            <label>To character<select id="treeTo"></select></label>
+            <fieldset class="treeTargetsField"><legend>Link to characters (choose as many as you want)</legend><div id="treeTargets" class="treeTargets" role="group" aria-label="Target characters"></div></fieldset>
             <label>Relationship<select id="treeNewType"></select></label>
-            <button id="treeConnectBtn" class="primary" type="button">+ Add connection</button>
+            <button id="treeConnectBtn" class="primary" type="button">+ Link selected</button>
           </div>
-          <p class="treeFootnote">For directional relationships, “parent of” means the first character is the parent of the second. Relationships and notes stay in the characters’ USB JSON files; dragged positions are saved separately in this novel’s <code>character-tree.json</code>.</p>
+          <p class="treeFootnote">You can link one character to any number of characters. For directional relationships, “parent of” means the first character is the parent of the selected characters. Relationships and notes stay in the characters’ USB JSON files; dragged positions are saved separately in this novel’s <code>character-tree.json</code>.</p>
         </div>
       </section>
       <div id="emptyView" class="emptyView">
@@ -204,6 +205,19 @@
         <button id="cancelDeleteBtn" class="quiet" type="button">Cancel</button>
         <button id="confirmDeleteBtn" class="dangerConfirm" type="button">Yes, delete</button>
       </div>
+    </div>
+  </dialog>
+  <dialog id="treeDropDialog" class="treeDropDialog" aria-labelledby="treeDropTitle" aria-describedby="treeDropDescription">
+    <div class="dialogBody">
+      <h2 id="treeDropTitle">Link these characters?</h2>
+      <p id="treeDropDescription"></p>
+      <label for="treeDropType">Relationship</label>
+      <select id="treeDropType"></select>
+      <div class="dialogActions">
+        <button id="treeDropCancel" type="button" class="quiet">Cancel</button>
+        <button id="treeDropConfirm" type="button" class="primary">Link characters</button>
+      </div>
+      <p class="helper">The dragged card returns to its original position so cards don't overlap. Connections save to the USB folder.</p>
     </div>
   </dialog>
   <div id="toast" class="toast hidden" role="alert"></div>

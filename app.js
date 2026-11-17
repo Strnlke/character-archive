@@ -31,6 +31,69 @@ const state = {
   revision: 0, savedRevision: 0, portraitUrl: null, galleryUrls: [], epoch: 0, treeMeta: null, treeRevision: 0, treeSavedRevision: 0, treeTimer: null, treeSaving: null
 };
 
+// One reversible action, held only in this browser tab. It never takes the place
+// of a real USB backup. Confirmed permanent deletes cannot be undone.
+let lastUndo = null, undoBusy = false, fieldFocusSerial = 0;
+function updateUndoButton() {
+  const button = $('undoBtn'); if (!button) return;
+  button.disabled = !lastUndo || undoBusy;
+  button.title = lastUndo ? 'Undo: ' + lastUndo.label : 'No reversible action to undo';
+  button.textContent = lastUndo ? '↶ Undo: ' + lastUndo.label : '↶ Undo';
+}
+function clearUndo() { lastUndo = null; updateUndoButton(); }
+function rememberUndo(label, rollback, group = null) {
+  if (group && lastUndo?.group === group) return;
+  lastUndo = { label, rollback, group, writerId: state.writer?.id || null, novelId: state.novel?.id || null };
+  updateUndoButton();
+}
+async function undoLast() {
+  const action = lastUndo;
+  if (!action || undoBusy) return;
+  if ((action.writerId && action.writerId !== state.writer?.id) ||
+      (action.novelId && action.novelId !== state.novel?.id)) {
+    clearUndo(); toast('Undo is available only in the library where the change happened.',true); return;
+  }
+  if (!(await flush())) { toast('Unable to undo until pending changes are saved.',true); return; }
+  undoBusy = true; updateUndoButton();
+  try {
+    const ok = await action.rollback();
+    if (ok === false) throw new Error('The USB update could not be completed.');
+    if (lastUndo === action) clearUndo();
+    toast('Undid: ' + action.label);
+  } catch(error) {
+    toast('Undo failed: ' + error.message + '. Check the USB files before retrying.',true);
+  } finally { undoBusy=false;updateUndoButton(); }
+}
+function rememberFieldUndo(character,section,key,original,group,label) {
+  rememberUndo(label || ('Edit '+ section + ' / ' + key), async () => {
+    const current = state.characters.find(c=>c.id===character.id);
+    if (!current) return false;
+    current[section] ??= {};
+    current[section][key] = original;
+    if (section==='basic' && key==='fullName') current.name=original || 'Unnamed';
+    // Save even when the edited character is not currently selected.
+    if (state.active===current) { queueSave(); if (!(await flush())) return false; }
+    else if (!(await persistTreeLink(current,structuredClone(current.relationships?.links || [])))) return false;
+    if (!$('editor').classList.contains('hidden') && state.active===current) renderEditor();
+    renderCharacterList();
+    return true;
+  },group);
+}
+function rememberLinksUndo(characters, oldLists, label, group = null) {
+  const captured = characters.map(c=>({id:c.id,links:structuredClone(oldLists.get(c.id))}));
+  rememberUndo(label,async () => {
+    for (const item of captured) {
+      const c=state.characters.find(x=>x.id===item.id);if(!c)return false;
+      const rollback=structuredClone(c.relationships?.links||[]);
+      c.relationships??={links:[],notes:''};c.relationships.links=structuredClone(item.links);
+      if(!(await persistTreeLink(c,rollback)))return false;
+    }
+    if (!$('treeView').classList.contains('hidden')) renderTree();
+    if (!$('editor').classList.contains('hidden') && state.active) renderEditor();
+    return true;
+  },group);
+}
+
 async function readJSON(handle) {
   const file = await handle.getFile();
   return JSON.parse(await file.text());
@@ -118,6 +181,7 @@ function clearNovelState() {
   cleanPortraitUrl(); cleanGalleryUrls();
 }
 function clearRootState() {
+  clearUndo();
   state.root = null; state.selectedLocation = null; state.manifest = null; state.writer = null; state.writerDir = null;
   state.novels = []; clearNovelState();
 }
@@ -267,11 +331,23 @@ async function createWriter() {
     state.manifest = manifest;
     renderWriterCards();
     await chooseWriter(writer.id);
+    rememberUndo('Create writer', async () => {
+      if (state.novels.length) return false;
+      // Refuse to undo writer creation if anything was added to its folder.
+      const folderHandle=await state.root.getDirectoryHandle(folder);
+      for await (const _item of folderHandle.entries()) return false;
+      await state.root.removeEntry(folder);
+      const next={...state.manifest,writers:state.manifest.writers.filter(x=>x.id!==writer.id)};
+      await putJSON(state.root,'character-archive-manifest.json',next);
+      state.manifest=next;state.writer=null;state.writerDir=null;state.novels=[];clearNovelState();
+      renderWriterCards();setStage('writer');return true;
+    });
   } catch (error) { toast('Could not create writer: ' + error.message, true); }
 }
 async function chooseWriter(id) {
   if (!(await flush())) { toast('Save your changes before switching writers.', true); return; }
   const writer = state.manifest.writers.find(w => w.id === id);
+  if (state.writer?.id !== id) clearUndo();
   if (!writer) return;
   try {
     const directory = await state.root.getDirectoryHandle(writer.folder);
@@ -317,12 +393,31 @@ async function createNovel() {
     await putJSON(directory, 'novel.json', novel);
     state.novels.push(novel); state.novels.sort((a,b) => a.name.localeCompare(b.name));
     await chooseNovel(novel.id);
+    rememberUndo('Create book', async () => {
+      if (state.characters.length) return false;
+      const novelDir=await state.writerDir.getDirectoryHandle(novel.folder);
+      for await (const [name,entry] of novelDir.entries()) {
+        if (name==='novel.json' && entry.kind==='file') continue;
+        if (['characters','portraits'].includes(name) && entry.kind==='directory') {
+          for await (const _nested of entry.entries()) return false;
+          continue;
+        }
+        return false; // Do not delete unfamiliar files via Undo.
+      }
+      await novelDir.removeEntry('novel.json');
+      await novelDir.removeEntry('characters');
+      await novelDir.removeEntry('portraits');
+      await state.writerDir.removeEntry(novel.folder);
+      state.novels=state.novels.filter(x=>x.id!==novel.id);clearNovelState();
+      renderNovelSelect();await showBookshelf();return true;
+    });
     toast('Novel created.');
   } catch (error) { toast('Could not create novel: ' + error.message, true); }
 }
 async function chooseNovel(id) {
   if (!(await flush())) { toast('Save your changes before switching novels.', true); renderNovelSelect(); return; }
   const novel = state.novels.find(n => n.id === id);
+  if (state.novel?.id !== id) clearUndo();
   if (!novel) return;
   try {
     const directory = await state.writerDir.getDirectoryHandle(novel.folder);
@@ -374,6 +469,13 @@ async function createCharacter() {
     state.characters.push(character);
     state.characters.sort((a,b) => a.name.localeCompare(b.name));
     await chooseCharacter(character.id);
+    rememberUndo('Create character',async () => {
+      if (!state.characters.some(x=>x.id===character.id)) return false;
+      await state.charsDir.removeEntry(character._filename);
+      state.characters=state.characters.filter(x=>x.id!==character.id);
+      if(state.active?.id===character.id)state.active=null;
+      await showCharacters();renderCharacterList();return true;
+    });
     toast('Character created and saved to the selected folder.');
   } catch (error) { toast('Could not create character: ' + error.message, true); }
 }
@@ -534,7 +636,7 @@ const sections = [
   { key: 'freeform', title: 'Freeform Notes', fields: [] }
 ];
 let fieldSerial = 0;
-function makeField(label, value, update, long = false) {
+function makeField(label, value, update, long = false, undoInfo = null) {
   const container = el('div', 'field' + (long ? ' wide' : ''));
   const lab = el('label', '', label);
   const input = el(long ? 'textarea' : 'input');
@@ -542,7 +644,17 @@ function makeField(label, value, update, long = false) {
   lab.htmlFor = input.id;
   if (long) input.rows = 3;
   input.value = value ?? '';
-  input.addEventListener('input', () => update(input.value));
+  let group = null;
+  input.addEventListener('focus',()=>{group='field-'+(++fieldFocusSerial);});
+  input.addEventListener('input', () => {
+    if (undoInfo) {
+      if (!group) group='field-'+(++fieldFocusSerial);
+      const { character, section, key }=undoInfo;
+      const before=character[section]?.[key] ?? '';
+      rememberFieldUndo(character,section,key,before,group,'Edit '+label);
+    }
+    update(input.value);
+  });
   container.append(lab, input);
   return container;
 }
@@ -575,7 +687,7 @@ function renderEditor() {
             renderCharacterList();
           }
           queueSave();
-        }, !!long));
+        }, !!long, {character,section:section.key,key}));
       }
       body.append(grid);
     }
@@ -584,7 +696,7 @@ function renderEditor() {
     notes.append(makeField(section.key === 'freeform' ? 'Notes' : 'Additional notes', character[section.key].notes || '', value => {
       character[section.key].notes = value;
       queueSave();
-    }, true));
+    }, true, {character,section:section.key,key:'notes'}));
     body.append(notes); details.append(summary, body); host.append(details);
   }
   void renderPortrait(character);
@@ -605,18 +717,19 @@ function renderRelationships(host, character) {
       const kind = el('select');
       kind.setAttribute('aria-label', 'Relationship type with ' + target.name);
       addTypes(kind, own.type);
-      kind.addEventListener('change', () => { own.type = kind.value; queueSave(); });
+      kind.addEventListener('change', () => { const old=new Map([[character.id,structuredClone(character.relationships.links)]]);own.type=kind.value; rememberLinksUndo([character],old,'Change relationship');queueSave(); });
       row.append(kind);
       const notes = el('textarea'); notes.placeholder = 'Notes from this character’s perspective…'; notes.value = own.notes || '';
-      notes.addEventListener('input', () => { own.notes = notes.value; queueSave(); });
+      let relationGroup=null;notes.addEventListener('focus',()=>{relationGroup='relation-'+(++fieldFocusSerial);});
+      notes.addEventListener('input', () => { if(!relationGroup)relationGroup='relation-'+(++fieldFocusSerial);const old=new Map([[character.id,structuredClone(character.relationships.links)]]); rememberLinksUndo([character],old,'Edit relationship notes',relationGroup);own.notes=notes.value; queueSave(); });
       row.append(notes);
       const remove = el('button','removeButton','Unlink'); remove.type = 'button';
-      remove.onclick = () => { character.relationships.links = character.relationships.links.filter(x => x.id !== link.id); queueSave(); renderEditor(); };
+      remove.onclick = () => { const old=new Map([[character.id,structuredClone(character.relationships.links)]]);character.relationships.links=character.relationships.links.filter(x=>x.id!==link.id);rememberLinksUndo([character],old,'Unlink character');queueSave();renderEditor(); };
       row.append(remove);
     } else {
       row.append(el('span','muted','Linked from '+target.name));
       const addOwn = el('button','quiet','Add my notes'); addOwn.type = 'button';
-      addOwn.onclick = () => { character.relationships.links.push({ id: target.id, notes: '' }); queueSave(); renderEditor(); };
+      addOwn.onclick = () => { const old=new Map([[character.id,structuredClone(character.relationships.links)]]);character.relationships.links.push({ id: target.id, notes: '' });rememberLinksUndo([character],old,'Add relationship notes');queueSave(); renderEditor(); };
       row.append(addOwn);
     }
     host.append(row);
@@ -626,7 +739,7 @@ function renderRelationships(host, character) {
   const linked = new Set(relatedCharacters(character).map(r => r.id));
   for (const c of state.characters.filter(c => c.id !== character.id && !linked.has(c.id))) select.add(new Option(c.name, c.id));
   const add = el('button','primary','Link character'); add.type = 'button'; add.disabled = select.options.length < 2;
-  add.onclick = () => { if (!select.value) return; character.relationships.links.push({ id: select.value, notes: '' }); queueSave(); renderEditor(); };
+  add.onclick = () => { if (!select.value) return; const old=new Map([[character.id,structuredClone(character.relationships.links)]]); character.relationships.links.push({ id: select.value, notes: '' });rememberLinksUndo([character],old,'Link character');queueSave(); renderEditor(); };
   picker.append(select,add); host.append(picker);
   host.append(el('p','muted','Links appear on both profiles; each writer can add notes from either character’s perspective.'));
 }
@@ -713,6 +826,7 @@ async function deleteCharacter(id) {
     await state.charsDir.removeEntry(character._filename);
     // Only after the character file is removed should the UI forget this character.
     state.characters = state.characters.filter(c => c.id !== character.id);
+    clearUndo(); // Permanent file deletion is intentionally not undoable.
     if (state.treeMeta?.positions?.[character.id]) { delete state.treeMeta.positions[character.id]; queueTreeSave(); }
     if (state.active?.id === character.id) {
       state.active = null;
@@ -757,6 +871,7 @@ async function deleteBook(id) {
     renderNovelSelect();
     await showBookshelf();
     status('Saved to folder');
+    clearUndo(); // Permanent deletion cannot be reversed through Undo.
     toast('Book and its character files deleted from USB.');
   } catch (error) {
     status('Delete failed', 'bad');
@@ -820,14 +935,18 @@ async function copyFolder(source, dest) {
    Only manual node positions live in character-tree.json; character metadata remains
    in the existing per-character JSON. Unknown relationships are NOT guessed. */
 const TREE_TYPES = [
-  ['connected', 'Connected (unspecified)'],
-  ['parent', 'Parent of →'],
-  ['child', 'Child of →'],
-  ['sibling', 'Sibling of'],
-  ['partner', 'Partner / spouse of'],
-  ['friend', 'Friend of'],
-  ['rival', 'Rival / enemy of'],
-  ['other', 'Other relationship']
+  ['connected','Connected (unspecified)'],
+  ['parent','Parent of →'],['child','Child of →'],
+  ['sibling','Sibling of'],['partner','Spouse / partner of'],
+  ['ex-spouse','Ex-spouse of'],['ex-partner','Ex-partner of'],
+  ['fiance','Fiancé(e) of'],['dating','Dating / romantic partner'],
+  ['grandparent','Grandparent of →'],['grandchild','Grandchild of →'],
+  ['aunt-uncle','Aunt / uncle of →'],['niece-nephew','Niece / nephew of →'],
+  ['cousin','Cousin of'],['step-parent','Step-parent of →'],['step-child','Step-child of →'],
+  ['adoptive-parent','Adoptive parent of →'],['adopted-child','Adopted child of →'],
+  ['friend','Friend of'],['best-friend','Best friend of'],['estranged','Estranged from'],
+  ['rival','Rival / enemy of'],['ally','Ally of'],['mentor','Mentor of →'],
+  ['student','Student of →'],['coworker','Coworker of'],['other','Other relationship']
 ];
 const treeTypeName = type => TREE_TYPES.find(([id]) => id === type)?.[1] || TREE_TYPES[0][1];
 const treeType = value => TREE_TYPES.some(([id]) => id === value) ? value : 'connected';
@@ -898,14 +1017,14 @@ function treeLayout(connections) {
   const groupParent=new Map(chars.map(c=>[c.id,c.id]));
   const find=id=>{let p=groupParent.get(id);while(p && p!==groupParent.get(p)){p=groupParent.get(p);}return p || id;};
   const unite=(a,b)=>{const x=find(a),y=find(b);if(x!==y)groupParent.set(y,x);};
-  for(const e of connections)if(['partner','sibling'].includes(e.type))unite(e.from,e.to);
+  for(const e of connections)if(['partner','sibling','ex-spouse','ex-partner','fiance','dating','cousin'].includes(e.type))unite(e.from,e.to);
   const groups=new Map(); for(const c of chars){const g=find(c.id);if(!groups.has(g))groups.set(g,[]);groups.get(g).push(c);}
   const levels=new Map([...groups.keys()].map(x=>[x,0]));
   const hier=[];
   for(const e of connections){
     let from=e.from,to=e.to;
-    if(e.type==='child') [from,to]=[to,from];
-    if(e.type!=='parent' && e.type!=='child')continue;
+    if(['child','grandchild','step-child','adopted-child','niece-nephew'].includes(e.type)) [from,to]=[to,from];
+    if(!['parent','child','grandparent','grandchild','step-parent','step-child','adoptive-parent','adopted-child','aunt-uncle','niece-nephew'].includes(e.type))continue;
     from=find(from);to=find(to);if(from!==to)hier.push({from,to});
   }
   // Relax parent-child ranks, with a guard against inconsistent cycles.
@@ -949,22 +1068,38 @@ function drawTreeLines(connections, positions, width, height) {
   svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
   for(const c of connections){
     const a=positions[c.from],b=positions[c.to];if(!a||!b)continue;
-    const ax=a.x+90,ay=a.y+48,bx=b.x+90,by=b.y+48;
-    const isHierarchy=['parent','child'].includes(c.type);
-    const upper=(c.type==='child')?b:a,lower=(c.type==='child')?a:b;
-    const startX=isHierarchy?upper.x+90:ax,startY=isHierarchy?upper.y+94:ay;
-    const endX=isHierarchy?lower.x+90:bx,endY=isHierarchy?lower.y:by;
-    const midY=(startY+endY)/2;
-    const path=svgEl('path');
-    path.setAttribute('d',isHierarchy && endY>startY
-      ?`M ${startX} ${startY} V ${midY} H ${endX} V ${endY}`
-      :`M ${startX} ${startY} C ${startX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`);
-    path.setAttribute('class','treeEdge'+(c.type==='connected'?' treeEdgeOther':''));
-    svg.append(path);
-    const text=svgEl('text');text.setAttribute('class','treeEdgeLabel');
-    text.setAttribute('x',(startX+endX)/2);text.setAttribute('y',midY-9);
-    text.setAttribute('text-anchor','middle');text.textContent=c.type==='connected'?'linked':c.type;
-    svg.append(text);
+    const hierarchy=['parent','child','grandparent','grandchild','step-parent','step-child','adoptive-parent','adopted-child','aunt-uncle','niece-nephew'].includes(c.type);
+    // Start/end at the actual card borders, rather than disappearing beneath them.
+    const parentReverse=['child','grandchild','step-child','adopted-child','niece-nephew'].includes(c.type);
+    const upper=parentReverse?b:a,lower=parentReverse?a:b;
+    let startX,startY,endX,endY,pathData;
+    if(hierarchy && lower.y>upper.y+90){
+      startX=upper.x+90;startY=upper.y+95;endX=lower.x+90;endY=lower.y;
+      const mid=(startY+endY)/2;
+      pathData=`M ${startX} ${startY} V ${mid} H ${endX} V ${endY}`;
+    }else{
+      const aCenter={x:a.x+90,y:a.y+48},bCenter={x:b.x+90,y:b.y+48};
+      if(Math.abs(aCenter.x-bCenter.x)>Math.abs(aCenter.y-bCenter.y)){
+        startX=aCenter.x+(aCenter.x<bCenter.x?90:-90);startY=aCenter.y;
+        endX=bCenter.x+(aCenter.x<bCenter.x?-90:90);endY=bCenter.y;
+      }else{
+        startX=aCenter.x;startY=aCenter.y+(aCenter.y<bCenter.y?47:-47);
+        endX=bCenter.x;endY=bCenter.y+(aCenter.y<bCenter.y?-47:47);
+      }
+      const mx=(startX+endX)/2;
+      pathData=`M ${startX} ${startY} C ${mx} ${startY}, ${mx} ${endY}, ${endX} ${endY}`;
+    }
+    const glow=svgEl('path');glow.setAttribute('d',pathData);glow.setAttribute('class','treeEdgeGlow');svg.append(glow);
+    const path=svgEl('path');path.setAttribute('d',pathData);
+    path.setAttribute('class','treeEdge'+(c.type==='connected'?' treeEdgeOther':''));svg.append(path);
+    const label=treeTypeName(c.type).replace(/ →$/,'').replace(/ of$/,'');
+    const lx=(startX+endX)/2,ly=(startY+endY)/2-10;
+    const labelWidth=Math.max(52,Math.min(220,label.length*6.6+18));
+    const back=svgEl('rect');back.setAttribute('x',lx-labelWidth/2);back.setAttribute('y',ly-15);
+    back.setAttribute('width',labelWidth);back.setAttribute('height',21);back.setAttribute('rx',6);
+    back.setAttribute('class','treeEdgeLabelBacking');svg.append(back);
+    const text=svgEl('text');text.setAttribute('class','treeEdgeLabel');text.setAttribute('x',lx);text.setAttribute('y',ly);
+    text.setAttribute('text-anchor','middle');text.textContent=label;svg.append(text);
   }
 }
 function addTypes(select,selected='connected') {
@@ -986,30 +1121,68 @@ async function persistTreeLink(source,oldLinks) {
   }
 }
 async function setTreeConnectionType(edge,type) {
-  if(!(await flush()))return;
+  if(!(await flush()))return false;
   const source=state.characters.find(c=>c.id===edge.from);
   const target=state.characters.find(c=>c.id===edge.to);
-  if(!source||!target)return;
-  // The selected displayed direction corresponds to its originating profile.
+  if(!source||!target)return false;
   source.relationships ??={links:[],notes:''};source.relationships.links??=[];
   const old=structuredClone(source.relationships.links);
   const link=source.relationships.links.find(x=>x.id===target.id);
   if(link)link.type=type;
   else source.relationships.links.push({id:target.id,notes:'',type});
-  if(await persistTreeLink(source,old))renderTree();
-}
-async function addTreeConnection() {
-  const from=$('treeFrom').value,to=$('treeTo').value,type=$('treeNewType').value;
-  if(!from||!to||from===to){toast('Select two different characters.',true);return;}
-  if(treeConnections().some(e=>[e.from,e.to].sort().join('|')===[from,to].sort().join('|'))){
-    toast('These characters are already linked. Edit their existing connection below.',true);return;
+  if(await persistTreeLink(source,old)) {
+    rememberLinksUndo([source],new Map([[source.id,old]]),'Change relationship');
+    renderTree();return true;
   }
+  return false;
+}
+async function addTreeConnections(from, targetIds, type) {
+  if(!from || !targetIds.length){toast('Select a source and one or more other characters.',true);return false;}
+  if(!(await flush()))return false;
   const source=state.characters.find(c=>c.id===from);
-  if(!source||!(await flush()))return;
+  if(!source)return false;
   source.relationships??={links:[],notes:''};source.relationships.links??=[];
   const old=structuredClone(source.relationships.links);
-  source.relationships.links.push({id:to,notes:'',type});
-  if(await persistTreeLink(source,old))renderTree();
+  let added=0;
+  for(const to of [...new Set(targetIds)]) {
+    if(to===from||!state.characters.some(c=>c.id===to))continue;
+    const key=[from,to].sort().join('|');
+    if(treeConnections().some(e=>e.key===key))continue;
+    source.relationships.links.push({id:to,notes:'',type});added++;
+  }
+  if(!added){toast('Those characters are already linked. You can change their relationship below.',true);return false;}
+  if(await persistTreeLink(source,old)) {
+    rememberLinksUndo([source],new Map([[source.id,old]]),`Link ${added} character${added===1?'':'s'}`);
+    renderTree();toast(`Linked ${added} character${added===1?'':'s'}; lines saved to USB.`);
+    return true;
+  }
+  return false;
+}
+async function addTreeConnection() {
+  const from=$('treeFrom').value;
+  const targets=[...document.querySelectorAll('#treeTargets input:checked')].map(input=>input.value);
+  const ok=await addTreeConnections(from,targets,$('treeNewType').value);
+  if(ok) for(const input of document.querySelectorAll('#treeTargets input:checked'))input.checked=false;
+}
+function askTreeDrop(source,target,existing) {
+  const dialog=$('treeDropDialog');
+  $('treeDropTitle').textContent=existing?'Change this relationship?':'Link these characters?';
+  $('treeDropDescription').textContent=existing?
+    `“${source.name}” and “${target.name}” are already linked. Choose a new relationship if you'd like to change it.`:
+    `Create a line connecting “${source.name}” to “${target.name}”?`;
+  const select=$('treeDropType');select.replaceChildren();addTypes(select,existing?.type||'connected');
+  $('treeDropConfirm').textContent=existing?'Change relationship':'Link characters';
+  return new Promise(resolve=>{
+    const cancel=$('treeDropCancel'),go=$('treeDropConfirm');let confirmed=false;
+    const onCancel=()=>dialog.close('cancel');
+    const onConfirm=()=>{confirmed=true;dialog.close('confirm')};
+    const onClose=()=>{
+      cancel.removeEventListener('click',onCancel);go.removeEventListener('click',onConfirm);dialog.removeEventListener('close',onClose);
+      resolve(confirmed?select.value:null);
+    };
+    cancel.addEventListener('click',onCancel);go.addEventListener('click',onConfirm);
+    dialog.addEventListener('close',onClose);dialog.showModal();cancel.focus();
+  });
 }
 async function removeTreeConnection(edge){
   const a=state.characters.find(c=>c.id===edge.from),b=state.characters.find(c=>c.id===edge.to);
@@ -1017,14 +1190,17 @@ async function removeTreeConnection(edge){
   if(!confirm(`Remove the connection between ${a.name} and ${b.name}? Their profiles will remain.`))return;
   if(!(await flush()))return;
   const changed=[a,b].filter(c=>(c.relationships?.links||[]).some(x=>x.id===(c===a?b.id:a.id)));
+  const before=new Map(changed.map(c=>[c.id,structuredClone(c.relationships.links)]));
+  let success=true;
   for(const c of changed){
     const old=structuredClone(c.relationships.links), other=c===a?b:a;
     c.relationships.links=c.relationships.links.filter(x=>x.id!==other.id);
     if(!(await persistTreeLink(c,old))){
       toast('The connection was only partially changed. Reopen the novel to inspect both profiles.',true);
-      break;
+      success=false;break;
     }
   }
+  if(success && changed.length)rememberLinksUndo(changed,before,'Remove relationship');
   renderTree();
 }
 function renderTree() {
@@ -1037,7 +1213,7 @@ function renderTree() {
   drawTreeLines(edges,positions,width,height);
   for(const character of state.characters){
     const p=positions[character.id];
-    const card=el('div','treeNode');card.style.left=p.x+'px';card.style.top=p.y+'px';
+    const card=el('div','treeNode');card.dataset.nodeId=character.id;card.style.left=p.x+'px';card.style.top=p.y+'px';
     const head=el('div','treeNodeHead');
     const role=el('span','treeNodeRole',character.story?.role||'Character');
     const drag=el('button','treeNodeHandle','⠿');drag.type='button';
@@ -1052,11 +1228,31 @@ function renderTree() {
       if(event.button!==0)return;
       event.preventDefault();drag.setPointerCapture(event.pointerId);
       const startX=event.clientX,startY=event.clientY,original={...positions[character.id]};
+      const previousManual=state.treeMeta?.positions?.[character.id];
+      const undoPosition=previousManual?{...previousManual}:null;
+      let moved=false;
+      const highlightTarget=()=>{
+        const p=positions[character.id];
+        let candidate=null,best=0;
+        for(const c of state.characters){
+          if(c.id===character.id)continue;
+          const q=positions[c.id];if(!q)continue;
+          const overlapX=Math.max(0,Math.min(p.x+180,q.x+180)-Math.max(p.x,q.x));
+          const overlapY=Math.max(0,Math.min(p.y+94,q.y+94)-Math.max(p.y,q.y));
+          const intersection=overlapX*overlapY;
+          if(intersection>1500 && intersection>best){best=intersection;candidate=c;}
+        }
+        container.querySelectorAll('.treeNode').forEach(n=>n.classList.remove('linkTarget'));
+        if(candidate)container.querySelector(`[data-node-id="${candidate.id}"]`)?.classList.add('linkTarget');
+        return candidate;
+      };
       const move=e=>{
         if(e.pointerId!==event.pointerId)return;
+        moved ||= Math.hypot(e.clientX-startX,e.clientY-startY)>5;
         positions[character.id]={x:Math.max(10,original.x+e.clientX-startX),y:Math.max(12,original.y+e.clientY-startY)};
         const next=positions[character.id];card.style.left=next.x+'px';card.style.top=next.y+'px';
         drawTreeLines(edges,positions,width,height);
+        highlightTarget();
       };
       const finish=e=>{
         if(e.pointerId!==event.pointerId)return;
@@ -1064,8 +1260,34 @@ function renderTree() {
         drag.removeEventListener('pointerup',finish);
         drag.removeEventListener('pointercancel',finish);
         const next=positions[character.id];
-        if(next.x!==original.x||next.y!==original.y){
-          state.treeMeta.positions[character.id]=next;queueTreeSave();
+        if(e.type==='pointercancel' || !moved){
+          positions[character.id]=original;card.style.left=original.x+'px';card.style.top=original.y+'px';
+          drawTreeLines(edges,positions,width,height);
+          container.querySelectorAll('.linkTarget').forEach(n=>n.classList.remove('linkTarget'));
+          return;
+        }
+        const target=highlightTarget();
+        container.querySelectorAll('.linkTarget').forEach(n=>n.classList.remove('linkTarget'));
+        if(target){
+          // A card-to-card drop is a link gesture, not an overlapping saved position.
+          positions[character.id]=original;card.style.left=original.x+'px';card.style.top=original.y+'px';
+          drawTreeLines(edges,positions,width,height);
+          const edge=edges.find(c=>c.key===[character.id,target.id].sort().join('|'));
+          void (async()=>{
+            const type=await askTreeDrop(character,target,edge);
+            if(type===null)return;
+            if(edge)await setTreeConnectionType(edge,type);
+            else await addTreeConnections(character.id,[target.id],type);
+          })();
+        }else if(next.x!==original.x||next.y!==original.y){
+          state.treeMeta.positions[character.id]={...next};queueTreeSave();
+          rememberUndo('Move character card',async()=>{
+            if(undoPosition)state.treeMeta.positions[character.id]={...undoPosition};
+            else delete state.treeMeta.positions[character.id];
+            queueTreeSave();if(!(await flushTree()))return false;
+            if(!$('treeView').classList.contains('hidden'))renderTree();
+            return true;
+          });
         }
       };
       drag.addEventListener('pointermove',move);drag.addEventListener('pointerup',finish);drag.addEventListener('pointercancel',finish);
@@ -1083,10 +1305,16 @@ function renderTree() {
     remove.addEventListener('click',()=>void removeTreeConnection(edge));
     row.append(select,remove);list.append(row);
   }
-  for(const id of ['treeFrom','treeTo']){
-    const select=$(id),prev=select.value;select.replaceChildren(new Option('Choose character…',''));
-    for(const c of state.characters)select.add(new Option(c.name,c.id));
-    if(state.characters.some(c=>c.id===prev))select.value=prev;
+  const source=$('treeFrom'),was=source.value;source.replaceChildren(new Option('Choose character…',''));
+  for(const c of state.characters)source.add(new Option(c.name,c.id));
+  if(state.characters.some(c=>c.id===was))source.value=was;
+  const targets=$('treeTargets'), checked=new Set([...targets.querySelectorAll('input:checked')].map(input=>input.value));
+  targets.replaceChildren();
+  for(const c of state.characters){
+    if(c.id===source.value)continue;
+    const lab=el('label','treeTargetOption');
+    const input=el('input');input.type='checkbox';input.value=c.id;input.checked=checked.has(c.id);
+    lab.append(input,el('span','',c.name));targets.append(lab);
   }
   $('treeNewType').replaceChildren();addTypes($('treeNewType'));
   $('treeConnectBtn').disabled=state.characters.length<2;
@@ -1104,7 +1332,9 @@ async function showTree() {
 }
 async function resetTreeLayout() {
   if(!state.novel || !confirm('Reset all manually arranged tree positions for this novel? Character profiles and connections will remain unchanged.'))return;
+  const before=structuredClone(state.treeMeta.positions);
   state.treeMeta.positions={};queueTreeSave();renderTree();
+  rememberUndo('Reset tree layout',async()=>{state.treeMeta.positions=structuredClone(before);queueTreeSave();if(!(await flushTree()))return false;if(!$('treeView').classList.contains('hidden'))renderTree();return true;});
 }
 
 /* Character export tools. No external libraries or network APIs.
@@ -1130,7 +1360,7 @@ function exportSections(character) {
       for (const link of relatedCharacters(character)) {
         const target = state.characters.find(c => c.id === link.id);
         if (!target) continue;
-        entries.push({label:'Linked character',value: target.name + (link.incoming ? ' (linked from their profile)' : '')});
+        entries.push({label:'Linked character',value: target.name + (link.incoming ? ' (linked from their profile)' : '') + (link.type ? ' — ' + treeTypeName(link.type) : '')});
         if (link.notes?.trim()) entries.push({label:'Relationship notes about '+target.name,value:link.notes.trim()});
       }
     }
@@ -1309,13 +1539,14 @@ async function exportDocx(scope) {
 }
 
 function init() {
+  $('undoBtn').onclick=()=>void undoLast();updateUndoButton();
   $('selectFolderBtn').onclick = selectFolder;
   $('reselectFolderBtn').onclick = selectFolder;
   $('changeFolderBtn').onclick = selectFolder;
   $('newWriterBtn').onclick = createWriter;
   const switchWriter = async () => {
     if (!(await flush())) return;
-    state.writer = null; state.writerDir = null; state.novels = []; clearNovelState();
+    clearUndo();state.writer = null; state.writerDir = null; state.novels = []; clearNovelState();
     renderWriterCards(); setStage('writer'); status('Choose writer');
   };
   $('switchWriterBtn').onclick = switchWriter;
@@ -1331,6 +1562,7 @@ function init() {
   $('treeCharactersBtn').onclick = () => void showCharacters();
   $('treeAutoLayoutBtn').onclick = () => void resetTreeLayout();
   $('treeConnectBtn').onclick = () => void addTreeConnection();
+  $('treeFrom').addEventListener('change',()=>{if(state.novel && !$('treeView').classList.contains('hidden'))renderTree();});
   $('editorTreeBtn').onclick = () => void showTree();
   $('profileTreeBtn').onclick = () => void showTree();
   $('novelViewDeleteBookBtn').onclick = () => { if (state.novel) void deleteBook(state.novel.id); };

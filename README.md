@@ -1,33 +1,36 @@
-# Character Bookshelf v3.3 — Character Tree
+# Character Bookshelf v3.4 — Connection Lines + One-Step Undo
 
-This version adds a visual **Character Tree** to each novel while retaining the dark bookshelf interface, per-writer folders, individual character JSON files, USB selection, deletion confirmations, and PDF/Word character exports.
+This is an update to the existing, tested GitHub Pages + manually selected USB-folder application. The site remains a local-file editor; no cloud authentication, servers, or API keys are required for the data.
 
-## What's new
+## What changed
 
-- **All Characters → Character Tree** navigation button. The tree has links back to **All Characters** and **Bookshelf**; a character's editor also has a **Character Tree** breadcrumb and sidebar button.
-- Every character appears automatically, including characters without relationships. Existing linked character pairs appear automatically as connections. **No family relationship is guessed:** old untyped links are labeled *Connected (unspecified)* until you classify them.
-- In **Edit connections**, add/remove links, and set the type: Connected, Parent of, Child of, Sibling, Partner/Spouse, Friend, Rival/Enemy, or Other. The type is stored in the character's existing `relationships.links` JSON, and also appears in the character profile editor.
-- Parent/child generations and sibling/partner grouping influence the automatic layout. **Drag by a card's handle** to arrange the tree manually. Positions are saved in a small per-novel `character-tree.json`. **Automatic layout** resets those manual positions after confirmation.
-- All connection and layout editing happens in the browser. There are **no new accounts, remote APIs, or storage dependencies**.
+- **Clear connecting lines:** Relationships now have brighter, thicker SVG connectors with readable labels and a faint highlight behind each line. Lines redraw as you move cards.
+- **More relationship choices:** Includes **Ex-spouse**, **Ex-partner**, engaged/fiancé(e), dating, extended/step/adoptive family, friends, allies, mentor/student, estranged, coworkers, and the original types. No story facts are invented or assigned automatically.
+- **Connect many characters in one action:** At the bottom of the tree, choose a source, check as many target characters as you want, choose a relationship type, and click **Link selected**. There is no fixed application-imposed limit on the number of distinct character links; performance still depends on browser and hardware. A pair of characters still has one displayed connection type. You can edit its type afterward.
+- **Drag to link:** Grab a card by its existing drag handle and drop it over another card. A confirmation dialog asks which relationship to assign. The moved card returns to its original location to prevent overlapping cards. Choosing Cancel does nothing.
+- **Global one-step Undo:** A top-bar Undo button is shown in every view. It can reverse the most recent supported change in the current writer/novel, including a field editing session, creating a writer/book/character, editing links, a multi-link batch, moving a card, and resetting the tree layout. The button operates on **one action only**, not full history. An editing session (typing in a field without leaving it) is one action. **Confirmed permanent file deletions are not reversible** and clear Undo. Reopening the browser, changing folders or switching writer/novel clears Undo as well. Undo is not a substitute for a backup.
+- **Versioned assets:** `app.js` and `styles.css` use a `?v=3.4` cache-buster to prevent the browser from mixing files across versions.
+- PDF and Word character exports, the bookshelf, individual JSON files, portraits, linked profile notes, and all previous navigational controls are retained.
 
-## Updating your working website
+## Installation
 
-1. **Back up your USB writing library** (a separate USB drive is ideal) before upgrading. The version snapshot ZIP contains application files, **not** a copy of your personal writing data.
-2. Extract this ZIP and upload/replace `index.html`, `app.js`, and `styles.css` **together** in the GitHub Pages repository that currently hosts your Character Bookshelf (not just the HTML file).
-3. Commit, confirm GitHub Pages finished deploying, and refresh with Ctrl+Shift+R.
-4. Reconnect the folder you normally use. Open a **test novel** and use **Character Tree** on the All Characters page.
-5. Add two sample characters, link them, set a relationship type, drag a card, wait for **Layout saved to USB**, then close/reopen the site and select the same folder to verify persistence.
+1. **Back up the entire Character Bookshelf / Character Archive USB library to another drive first.** This application download contains no personal character data.
+2. Keep a copy of the previous version ZIP in case you want to revert.
+3. Extract this ZIP. In your existing GitHub Pages repository, **replace all three application files together:** `index.html`, `app.js`, and `styles.css`. Upload the files, not the ZIP.
+4. Commit changes and check the GitHub Pages deployment. Refresh the page with **Ctrl+Shift+R**.
+5. Use your **test novel** first. Reopen the USB folder, try two new connections, a multi-target batch, drag-to-link, and Undo. Close/reopen the site and check that saved relationships remain.
 
-## Storage & compatibility
+## Data compatibility
 
-The existing manifest, novel folders, writer folders, portrait files, and all character JSON files remain in place. No migration or renaming is needed. The only new file is `character-tree.json`, created **inside that novel's existing folder** when a manual node position is saved or reset. Type edits/additions/removals update the relevant character's JSON file immediately. Connections shown without a type are never assumed to be family relationships.
+No migration is needed. This release uses the existing per-writer/per-novel folder layout, character JSON profiles, and `character-tree.json` position file. It also recognizes older `Character Archive` USB library folders. Additional relationship names are saved as strings in existing `relationships.links[*].type` fields. The v3.3 app will display unknown new types as 'Connected (unspecified)', so the recommended rollback is to use v3.4 or keep a complete USB backup.
 
-Removing connections edits profile links, not characters. If a pair of characters was linked in both directions, their two JSON files may require separate writes; an interrupted USB connection could cause a partial update. In that case, reopen the novel and inspect both profiles before retrying. A character is never automatically deleted when removing a connection.
+## Tested
 
-## Tests performed
+The JavaScript passed `node --check`. Chromium automated tests using a **mock File System Access API** covered: creating writer/book/characters; linking three targets in one batch; three visible SVG lines; undoing the batch and confirming saved JSON reverted; undoing drag positions; changing to Ex-spouse and undoing; text-field edits and undo; dragging one card onto another and confirming the modal; and reopening the library to confirm relationships survived. The image preview was captured from the Chromium run. **The new version has not yet been tested with a physical USB drive; verify it on an expendable test library before using your manuscript data.**
 
-Static JavaScript check and automated Chromium **mocked USB folder** tests covered: writer/novel/character creation; automatic display of all characters; connection creation, type changes, cancellation of removal, confirmed removal; manual drag and layout-save file creation; resetting layout; reopening a mock library and recovering the tree. The visual preview was captured from Chromium. **Real flash-drive testing of v3.3 has not yet been completed.**
+## Safety notes
 
-## Version snapshots
-
-Separate snapshot archive contains the exact prior v3.2 ZIP and this v3.3 release, plus screenshots and a change log. Save future release ZIP files together so you can restore a known-working version without affecting the USB writing data.
+- If you see **Save failed**, keep the browser tab open and reconnect the drive before proceeding.
+- Browser and OS restrictions still apply. Use a recent desktop Chrome or Edge via HTTPS GitHub Pages.
+- Relationship edits to multiple reciprocal profile files are not transactional; if the USB is unplugged mid-save, reopen the novel and inspect both profiles before retrying.
+- Character and book **Delete** buttons still show their separate “Are you sure?” warning. These confirmed deletions cannot be undone by the new one-step Undo button.
