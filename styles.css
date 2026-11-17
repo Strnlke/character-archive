@@ -156,3 +156,67 @@
 #refreshViewBtn{border-color:#426080;color:#c9dcf4;white-space:nowrap}
 #refreshViewBtn:hover{background:#233c56}
 #refreshViewBtn:disabled{opacity:.55;cursor:wait}
+
+/* v3.6 — Timeline, search, cover uploads, revision history and tree exports */
+.timelineView,.librarySearchView{max-width:1200px;margin:0 auto;animation:pageReveal .18s ease-out}
+.timelineToolbar{display:flex;align-items:center;gap:15px;flex-wrap:wrap;padding:14px 0 22px;border-bottom:1px solid #344761;margin-bottom:22px}
+.timelineModes{display:flex;overflow:hidden;border:1px solid #48678b;border-radius:9px}
+.timelineMode{padding:10px 16px;background:#16283c;border:0;color:#c5d7ec;font-weight:650}
+.timelineMode.selected{background:#355b83;color:#fff}
+.timelineMode:not(.selected):hover{background:#263e59}
+.timelineToolbar label{font-size:12px;color:#9db8d8;display:flex;align-items:center;gap:8px}
+.timelineToolbar select{min-width:190px}
+.timelineToolbar .count{margin-left:auto}
+.timelineEntries{display:flex;flex-direction:column;gap:20px}
+.timelineGroup{background:#121e2c;border:1px solid #30435c;border-radius:12px;overflow:hidden}
+.timelineYear{padding:13px 18px;margin:0;background:linear-gradient(100deg,#233c58,#1b3048);font-size:20px;color:#e8f2ff;border-bottom:1px solid #3b5777}
+.timelineRail{margin:14px 22px 19px 24px;border-left:2px solid #678fb8;display:flex;flex-direction:column;gap:12px}
+.timelineRow{display:flex;gap:16px;align-items:center;margin-left:-7px}
+.timelineBullet{width:12px;height:12px;background:#aac9ed;box-shadow:0 0 0 4px #1c334d;border:2px solid #426e9a;border-radius:50%;flex:none}
+.timelineCard{flex:1;min-width:0;border:1px solid #405673;border-radius:9px;background:#1a2b3e;display:flex;align-items:stretch;justify-content:space-between}
+.timelineCard:hover{border-color:#799ac2}
+.timelineEventOpen{flex:1;min-width:0;border:0;background:transparent;padding:14px 17px;text-align:left;color:#f2f7ff;display:flex;flex-direction:column;gap:6px}
+.timelineEventOpen strong{font-size:15px}
+.timelineEventOpen .muted{font-size:12px}
+.timelineExcerpt{white-space:pre-wrap;overflow-wrap:anywhere;color:#abbfd5;font-size:12px;max-height:3.3em;overflow:hidden}
+.timelineTags{color:#d0e4ff;font-size:11px;font-weight:650}
+.timelineRowActions{display:flex;align-items:center;gap:5px;padding:6px 10px}
+.timelineRowActions button{padding:7px 10px}
+.timelineRowActions button:disabled{opacity:.25}
+.timelineTip{font-size:12px;line-height:1.6;color:#9fb3cb;max-width:920px;margin-top:20px}
+.characterTimelineBlock{border:1px solid #364d67;border-radius:11px;margin:18px 0 6px;padding:14px;background:#142336}
+.characterTimelineHeading{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:10px}
+.characterTimelineHeading h3{font-size:16px;margin:0}
+.characterEventButton{display:block;width:100%;text-align:left;padding:10px 12px;margin:7px 0;border-radius:8px;border:1px solid #3e5978;background:#20364b;color:#e4efff}
+.characterEventButton:hover{background:#2c4a66}
+.characterTimelineBlock>.textButton{margin-top:8px}
+.timelineEventDialog{width:min(94vw,720px);max-height:90vh;overflow:auto}
+.timelineFormGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.timelineFormGrid label.wide{grid-column:1/-1}
+.timelineFormGrid label{display:flex;flex-direction:column;gap:6px}
+.timelineEventDialog textarea{width:100%}
+.eventCharacterField{border:1px solid #3a516d;border-radius:9px;margin:15px 0;padding:12px 15px}
+.eventCharacterField legend{font-size:12px;color:#bfd5ec;font-weight:700}
+.eventCharacterChoices{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;max-height:200px;overflow:auto}
+.eventCharacterChoice{display:flex!important;align-items:center;gap:7px;margin:0!important;font-weight:500!important}
+.eventCharacterChoice input{width:auto!important;accent-color:#79a8e1}
+.searchBar{display:flex;align-items:center;gap:12px;margin:25px 0}
+.searchBar input{flex:1;font-size:16px;min-width:0;padding:13px 15px}
+.searchResults{display:flex;flex-direction:column;gap:10px;max-width:980px}
+.searchSummary{font-size:12px;color:#9fb6d1;font-weight:750}
+.searchHit{display:flex;flex-direction:column;gap:5px;text-align:left;padding:15px 18px;background:#17273b;border:1px solid #36506e;border-radius:10px;color:#edf5ff}
+.searchHit:hover{background:#223a54;border-color:#709bc8}
+.searchExcerpt{font-size:12px;color:#c3d5e8;white-space:pre-wrap;overflow-wrap:anywhere}
+.uploadedBookImage{width:100%;height:100%;object-fit:cover;display:block}
+.bookFront:has(.uploadedBookImage){padding:0}
+.bookFront:has(.uploadedBookImage):before{display:none}
+.profileHeaderActions{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.profileHeaderActions .quiet{white-space:nowrap}
+.revisionHistoryDialog{width:min(94vw,720px);max-height:85vh;overflow:auto}
+.revisionHistoryList{display:flex;flex-direction:column;gap:9px;max-height:55vh;overflow:auto}
+.revisionRow{display:flex;align-items:center;gap:12px;background:#1b3046;border:1px solid #3a5677;border-radius:9px;padding:12px}
+.revisionRow strong{flex:1;font-size:12px;overflow-wrap:anywhere}
+.treeHeadingActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:750px){.timelineFormGrid{grid-template-columns:1fr}.timelineToolbar{gap:8px}.timelineRowActions{flex-direction:column}.timelineEventOpen{padding:12px}.timelineYear{font-size:17px}.profileHeaderActions{width:100%;align-items:flex-start}.searchBar{align-items:stretch;flex-direction:column}.treeHeadingActions{justify-content:flex-start}}
+
+.timelineCard[draggable="true"]{cursor:grab}.timelineCard.dragOver{border-color:#b5d8ff;background:#294b6b;box-shadow:0 0 0 2px #9fc9fb66}

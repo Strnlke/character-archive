@@ -28,7 +28,7 @@ const state = {
   root: null, selectedLocation: null, manifest: null, writer: null, writerDir: null,
   novels: [], novel: null, novelDir: null, charsDir: null, portraitsDir: null,
   characters: [], active: null, saveTimer: null, saving: null,
-  revision: 0, savedRevision: 0, portraitUrl: null, galleryUrls: [], epoch: 0, treeMeta: null, treeRevision: 0, treeSavedRevision: 0, treeTimer: null, treeSaving: null
+  revision: 0, savedRevision: 0, portraitUrl: null, galleryUrls: [], epoch: 0, treeMeta: null, treeRevision: 0, treeSavedRevision: 0, treeTimer: null, treeSaving: null, timelineEvents: [], timelineFilter: 'all', coverUrls: [], searchEpoch: 0
 };
 
 // One reversible action PER PAGE, held in this browser tab only. This is not a
@@ -39,7 +39,7 @@ const NAV_KEY = 'character-bookshelf-navigation-v35';
 function pageType() {
   if (!state.root) return 'folder';
   if ($('workspace').classList.contains('hidden')) return 'writers';
-  for (const [id, kind] of [['bookshelfView','bookshelf'],['novelView','characters'],['treeView','tree'],['editor','editor']]) {
+  for (const [id, kind] of [['bookshelfView','bookshelf'],['novelView','characters'],['treeView','tree'],['timelineView','timeline'],['librarySearchView','search'],['editor','editor']]) {
     if (!$(id).classList.contains('hidden')) return kind;
   }
   return 'bookshelf';
@@ -48,7 +48,7 @@ function pageUndoKey(kind = pageType()) {
   const library = state.manifest?.createdAt || state.root?.name || 'library';
   if (kind === 'writers') return library + '/writers';
   const writer = state.writer?.id || '-';
-  if (kind === 'bookshelf') return [library,writer,'bookshelf'].join('/');
+  if (kind === 'bookshelf' || kind === 'search') return [library,writer,kind].join('/');
   const novel = state.novel?.id || '-';
   if (kind === 'editor') return [library,writer,novel,'editor',state.active?.id || '-'].join('/');
   return [library,writer,novel,kind].join('/');
@@ -105,11 +105,15 @@ async function restoreNavigation(route) {
   if (!route?.writerId || !state.manifest?.writers.some(w => w.id === route.writerId)) return;
   if (route.libraryCreatedAt && state.manifest.createdAt !== route.libraryCreatedAt) return;
   await chooseWriter(route.writerId);
+  if (route.view === 'search') { await showLibrarySearch(); return; }
+  if (route.view === 'bookshelf') { await showBookshelf(); return; }
   if (!route.novelId || !state.novels.some(n => n.id === route.novelId)) return;
   await chooseNovel(route.novelId);
   if (route.view === 'tree') await showTree();
+  else if (route.view === 'timeline') await showTimeline();
   else if (route.view === 'editor' && state.characters.some(c => c.id === route.characterId)) await chooseCharacter(route.characterId);
   else if (route.view === 'bookshelf') await showBookshelf();
+  else if (route.view === 'search') await showLibrarySearch();
 }
 async function refreshCurrentView() {
   if (!state.root || undoBusy) return;
@@ -131,6 +135,7 @@ async function refreshCurrentView() {
       if (page !== 'bookshelf' && novelId && state.novels.some(n => n.id === novelId)) {
         await chooseNovel(novelId);
         if (page === 'tree') await showTree();
+        else if (page === 'timeline') await showTimeline();
         else if (page === 'editor' && characterId && state.characters.some(c => c.id === characterId)) await chooseCharacter(characterId);
       }
     } else {
@@ -138,7 +143,8 @@ async function refreshCurrentView() {
       setStage('writer');
     }
     // A fresh read may have changed the target files; a stale Undo must not overwrite them.
-    if (page === 'bookshelf') {
+    if (page === 'search') { await showLibrarySearch(); }
+    if (page === 'bookshelf' || page === 'search') {
       for (const key of undoByPage.keys()) if (key.includes('/' + writerId + '/')) undoByPage.delete(key);
     } else if (novelId) {
       for (const key of undoByPage.keys()) if (key.includes('/' + novelId + '/')) undoByPage.delete(key);
@@ -209,6 +215,80 @@ function queueSave() {
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(() => { void flush(); }, 700);
 }
+
+/* Profile snapshots are regular JSON files on the selected USB library.
+   Keep up to 12 timestamped versions, no more than one automatic snapshot
+   per 15 minutes. An explicit restore always protects the current copy. */
+const REVISION_GAP_MS = 15 * 60 * 1000;
+async function revisionFolder(character, create = false) {
+  if (!state.novelDir) throw new Error('No novel open.');
+  let root;
+  try { root = await state.novelDir.getDirectoryHandle('revisions', {create}); }
+  catch(e){ if(!create && e.name==='NotFoundError')return null;throw e; }
+  try { return await root.getDirectoryHandle(character.id, {create}); }
+  catch(e){ if(!create && e.name==='NotFoundError')return null;throw e; }
+}
+async function listRevisions(character) {
+  const directory = await revisionFolder(character);
+  if(!directory)return [];
+  const out=[];
+  for await (const [name, entry] of directory.entries()) {
+    if(entry.kind!=='file'||!name.endsWith('.json'))continue;
+    out.push({name,handle:entry,stamp:name.slice(0,-5)});
+  }
+  return out.sort((a,b)=>b.name.localeCompare(a.name));
+}
+async function saveRevisionBeforeChange(character, force=false) {
+  const existing=await listRevisions(character);
+  const latest=existing[0];
+  if(!force && latest) {
+    const stamp = Date.parse(latest.stamp.slice(0,24).replace(/T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/,'T$1:$2:$3.$4Z'));
+    // Filenames use a safe ISO-like stamp and are comparable as strings.
+    if(Number.isFinite(stamp) && Date.now()-stamp<REVISION_GAP_MS)return;
+  }
+  const disk=await readJSON(character._handle);
+  const current=JSON.stringify(diskProfile(character));
+  if(!force && JSON.stringify(disk)===current)return;
+  const dir=await revisionFolder(character,true);
+  const stamp=dateNow().replace(/[:.]/g,'-').replace(/Z$/,'Z');
+  const safeStamp=stamp+'-'+Math.random().toString(36).slice(2,7);
+  await putJSON(dir,safeStamp+'.json',disk);
+  const all=await listRevisions(character);
+  for(const old of all.slice(12)) {
+    try{await dir.removeEntry(old.name);}catch(e){console.warn('Could not prune old revision',e);}
+  }
+}
+async function showRevisionHistory() {
+  const character=state.active;
+  if(!character || !(await flush()))return;
+  const dialog=$('revisionHistoryDialog'),host=$('revisionHistoryList');host.replaceChildren();
+  const list=await listRevisions(character);
+  if(!list.length)host.append(el('p','muted','No previous versions yet. A revision is saved before the next profile edit and periodically afterward.'));
+  for(const entry of list){
+    const row=el('div','revisionRow');
+    row.append(el('strong','',entry.stamp.replaceAll('_',' ')));
+    const preview=el('button','quiet','Preview');preview.type='button';
+    preview.onclick=async()=>{try{const old=await readJSON(entry.handle);window.alert(JSON.stringify(old,null,2).slice(0,14000));}catch(e){toast('Could not read revision: '+e.message,true);}};
+    const restore=el('button','quiet','Restore');restore.type='button';
+    restore.onclick=async()=>{
+      if(!confirm('Restore this earlier character profile? A backup of your current profile will be created first.'))return;
+      try{
+        const old=await readJSON(entry.handle);
+        if(old.id!==character.id)throw Error('Revision belongs to a different character.');
+        await saveRevisionBeforeChange(character,true);
+        const handle=character._handle,filename=character._filename;
+        for(const key of Object.keys(character))if(!key.startsWith('_'))delete character[key];
+        Object.assign(character,old,{_handle:handle,_filename:filename});
+        state.active=character;queueSave();
+        if(!(await flush()))throw Error('Save failed; do not close this tab.');
+        dialog.close();renderEditor();toast('Earlier character revision restored.');
+      }catch(e){toast('Restore failed: '+e.message,true);}
+    };
+    row.append(preview,restore);host.append(row);
+  }
+  dialog.showModal();
+}
+
 async function flushProfile() {
   clearTimeout(state.saveTimer);
   state.saveTimer = null;
@@ -223,6 +303,7 @@ async function flushProfile() {
       const snapshot = diskProfile({ ...character, updatedAt: now });
       try {
         status('Saving to USB…', 'busy');
+        await saveRevisionBeforeChange(character);
         await writeHandle(character._handle, JSON.stringify(snapshot, null, 2) + '\n');
         state.savedRevision = revision;
         character.updatedAt = now;
@@ -259,6 +340,7 @@ function setStage(stage) {
   $('topSwitchWriterBtn').classList.toggle('hidden', stage !== 'workspace');
   $('changeFolderBtn').classList.toggle('hidden', !state.root);
   $('refreshViewBtn').classList.toggle('hidden', stage !== 'workspace');
+  $('globalSearchBtn').classList.toggle('hidden', stage !== 'workspace');
   updateUndoButton();
 }
 function clearNovelState() {
@@ -267,8 +349,10 @@ function clearNovelState() {
   state.epoch++;
   clearTimeout(state.treeTimer); state.treeTimer=null; state.treeMeta=null;
   state.treeRevision=0; state.treeSavedRevision=0; state.treeSaving=null;
-  cleanPortraitUrl(); cleanGalleryUrls();
+  state.timelineEvents = []; state.timelineFilter = 'all';
+  cleanPortraitUrl(); cleanGalleryUrls(); cleanCoverUrls();
 }
+
 function clearRootState() {
   clearUndo();
   state.root = null; state.selectedLocation = null; state.manifest = null; state.writer = null; state.writerDir = null;
@@ -513,6 +597,7 @@ async function chooseNovel(id) {
     const charsDir = await directory.getDirectoryHandle('characters', { create: true });
     const portraitsDir = await directory.getDirectoryHandle('portraits', { create: true });
     const treeMeta = await loadTreeMeta(directory);
+    const timelineEvents = await loadTimelineEvents(directory);
     const characters = [];
     for await (const [filename, handle] of charsDir.entries()) {
       if (handle.kind !== 'file' || !filename.toLowerCase().endsWith('.json')) continue;
@@ -527,7 +612,7 @@ async function chooseNovel(id) {
     clearNovelState();
     state.novel = novel; state.novelDir = directory; state.charsDir = charsDir; state.portraitsDir = portraitsDir;
     state.characters = characters.sort((a,b) => a.name.localeCompare(b.name));
-    state.treeMeta = treeMeta;
+    state.treeMeta = treeMeta; state.timelineEvents = timelineEvents;
     renderNovelSelect(); renderCharacterList();
     await showCharacters();
     status('Library ready');
@@ -584,7 +669,7 @@ function renderCharacterList() {
   $('newCharacterBtn').disabled = !state.novel;
 }
 function hideMainViews() {
-  for (const id of ['bookshelfView', 'novelView', 'treeView', 'emptyView', 'editor']) $(id).classList.add('hidden');
+  for (const id of ['bookshelfView', 'novelView', 'treeView', 'timelineView', 'librarySearchView', 'emptyView', 'editor']) $(id).classList.add('hidden');
 }
 function cleanGalleryUrls() {
   for (const url of state.galleryUrls) URL.revokeObjectURL(url);
@@ -598,6 +683,7 @@ function makeBook(novel, index) {
   const cover = el('span','bookFront');
   cover.append(el('span', 'bookOrnament', '✦'), el('span','bookTitle',novel.name), el('span','bookFooter','CHARACTER COLLECTION'));
   button.append(cover);
+  if (novel.coverFile) void showBookCover(novel,cover);
   button.addEventListener('click', () => void chooseNovel(novel.id));
   const remove = el('button', 'bookDeleteBtn', '×');
   remove.type = 'button';
@@ -611,7 +697,7 @@ async function showBookshelf() {
   if (!(await flush())) { toast('Please save your changes before returning to your bookshelf.', true); return; }
   if (!state.writer) return;
   hideMainViews();
-  cleanGalleryUrls();
+  cleanGalleryUrls();cleanCoverUrls();
   $('bookshelfView').classList.remove('hidden');
   $('shelfTitle').textContent = state.writer.name + "'s Bookshelf";
   $('shelfSubtitle').textContent = state.novels.length ?
@@ -642,6 +728,7 @@ async function showCharacters() {
   $('novelViewSubtitle').textContent = 'Browse all characters in this novel.';
   $('novelViewKicker').textContent = state.writer.name.toUpperCase() + ' / NOVEL';
   $('novelCharacterCount').textContent = String(state.characters.length);
+  $('removeCoverBtn').disabled=!state.novel.coverFile;
   const host = $('characterGallery');
   cleanGalleryUrls(); host.replaceChildren();
   if (!state.characters.length) {
@@ -783,6 +870,7 @@ function renderEditor() {
       body.append(grid);
     }
     if (section.key === 'relationships') renderRelationships(body, character);
+    if (section.key === 'story') renderCharacterTimelineEvents(body, character);
     const notes = el('div','notes');
     notes.append(makeField(section.key === 'freeform' ? 'Notes' : 'Additional notes', character[section.key].notes || '', value => {
       character[section.key].notes = value;
@@ -925,10 +1013,20 @@ async function deleteCharacter(id) {
       state.epoch++;
       cleanPortraitUrl();
     }
+    // A deleted character's private revision snapshots are also removed.
+    try {const revisions=await state.novelDir.getDirectoryHandle('revisions');await revisions.removeEntry(character.id,{recursive:true});}
+    catch(e){if(e.name!=='NotFoundError')console.warn('Could not clean character revisions:',e);}
     let portraitFailure = null;
     if (character.portraitFile && character.portraitFile.startsWith(character.id + '.')) {
       try { await state.portraitsDir.removeEntry(character.portraitFile); }
       catch (error) { if (error.name !== 'NotFoundError') portraitFailure = error; }
+    }
+    if(state.timelineEvents.some(e=>e.characterIds.includes(character.id))) {
+      try{
+        const next=state.timelineEvents.map(e=>({...e,characterIds:e.characterIds.filter(id=>id!==character.id)}));
+        await putJSON(state.novelDir,'timeline.json',{type:'character-bookshelf-timeline',version:1,events:next});
+        state.timelineEvents=next;
+      } catch(e){toast('Character deleted, but timeline links need checking: '+e.message,true);}
     }
     renderCharacterList();
     await showCharacters();
@@ -1428,6 +1526,332 @@ async function resetTreeLayout() {
   rememberUndo('Reset tree layout',async()=>{state.treeMeta.positions=structuredClone(before);queueTreeSave();if(!(await flushTree()))return false;if(!$('treeView').classList.contains('hidden'))renderTree();return true;});
 }
 
+/* v3.6: Structured Timeline — single event record shared across novel-wide
+   and filtered character views. Freeform character notes are NEVER parsed. */
+async function loadTimelineEvents(directory) {
+  try {
+    const data=await readJSON(await directory.getFileHandle('timeline.json'));
+    if(data.type!=='character-bookshelf-timeline' || !Array.isArray(data.events))throw Error('Invalid timeline.json; nothing was modified.');
+    return data.events.map((e,i)=>({id:String(e.id),title:String(e.title||'Untitled event'),year:e.year===null||e.year===undefined||e.year===''?null:Number(e.year),dateText:String(e.dateText||''),notes:String(e.notes||''),characterIds:Array.isArray(e.characterIds)?e.characterIds.map(String):[],order:Number.isFinite(Number(e.order))?Number(e.order):i,createdAt:e.createdAt||dateNow()}));
+  } catch(e){if(e.name==='NotFoundError')return [];throw e;}
+}
+async function writeTimeline(next, label='Timeline updated', old=null, scope=pageUndoKey()) {
+  if(!state.novelDir)throw Error('Choose a novel.');
+  const before=structuredClone(old||state.timelineEvents);
+  await putJSON(state.novelDir,'timeline.json',{type:'character-bookshelf-timeline',version:1,events:next});
+  state.timelineEvents=structuredClone(next);
+  rememberUndo(label,async()=>{
+    await putJSON(state.novelDir,'timeline.json',{type:'character-bookshelf-timeline',version:1,events:before});
+    state.timelineEvents=structuredClone(before);
+    if(pageType()==='timeline')renderTimeline();
+    if(pageType()==='editor' && state.active)renderEditor();
+    return true;
+  },null,scope);
+  status('Saved to folder');
+}
+function eventYearKey(event) {return event.year===null||!Number.isFinite(event.year)?'undated':String(event.year);}
+function sortedTimelineEvents(events) {
+  return [...events].sort((a,b)=>{
+    const ya=eventYearKey(a),yb=eventYearKey(b);
+    if(ya==='undated'&&yb!=='undated')return 1;
+    if(yb==='undated'&&ya!=='undated')return -1;
+    if(ya!==yb)return Number(ya)-Number(yb);
+    return (a.order??0)-(b.order??0)||a.title.localeCompare(b.title);
+  });
+}
+function renderCharacterTimelineEvents(host,character) {
+  const block=el('div','characterTimelineBlock');
+  const heading=el('div','characterTimelineHeading');
+  heading.append(el('h3','','Timeline events'));
+  const add=el('button','quiet','＋ Add event');add.type='button';
+  add.onclick=()=>openTimelineEventDialog(null,character.id);
+  heading.append(add);block.append(heading);
+  const entries=sortedTimelineEvents(state.timelineEvents.filter(e=>e.characterIds.includes(character.id)));
+  if(!entries.length)block.append(el('p','muted','No structured timeline events for this character. Add one here or link this character to an event on the novel timeline. Your existing Important Events notes remain unchanged.'));
+  for(const entry of entries){
+    const btn=el('button','characterEventButton', (entry.year??'Undated')+' · '+entry.title);
+    btn.type='button';btn.onclick=async()=>{await showTimeline();openTimelineEventDialog(entry.id);};
+    block.append(btn);
+  }
+  const all=el('button','textButton','View novel timeline →');all.type='button';all.onclick=()=>void showTimeline();block.append(all);
+  host.append(block);
+}
+function openTimelineEventDialog(id=null,prefillCharacterId=null) {
+  if(!state.novel)return;
+  const event=state.timelineEvents.find(e=>e.id===id)||null;
+  const dialog=$('timelineEventDialog');
+  dialog.dataset.eventId=event?.id||'';
+  dialog.dataset.origin=pageType();
+  $('timelineDialogHeading').textContent=event?'Edit Timeline Event':'Add Timeline Event';
+  $('eventTitleInput').value=event?.title||'';
+  $('eventYearInput').value=event?.year??'';
+  $('eventDateInput').value=event?.dateText||'';
+  $('eventNotesInput').value=event?.notes||'';
+  const host=$('eventCharacterChoices');host.replaceChildren();
+  for(const c of state.characters){
+    const label=el('label','eventCharacterChoice');const check=el('input');check.type='checkbox';check.value=c.id;
+    check.checked=event?event.characterIds.includes(c.id):prefillCharacterId===c.id;
+    label.append(check,el('span','',c.name));host.append(label);
+  }
+  dialog.showModal();$('eventTitleInput').focus();
+}
+async function saveTimelineEvent(evt) {
+  evt.preventDefault();
+  const title=cleanName($('eventTitleInput').value);
+  if(!title){$('eventTitleInput').focus();return;}
+  const rawYear=$('eventYearInput').value.trim();
+  const year=rawYear===''?null:Number(rawYear);
+  if(year!==null && (!Number.isInteger(year)||year < -9999||year > 9999)){toast('Enter a year from -9999 to 9999, or leave it blank.',true);return;}
+  const id=$('timelineEventDialog').dataset.eventId;
+  const original=state.timelineEvents.find(e=>e.id===id);
+  const before=structuredClone(state.timelineEvents);
+  const selected=[...$('eventCharacterChoices').querySelectorAll('input:checked')].map(x=>x.value);
+  const changed={id:original?.id||randomId(),title,year,dateText:cleanName($('eventDateInput').value),notes:$('eventNotesInput').value,characterIds:selected,order:original?.order??(Math.max(-1,...state.timelineEvents.filter(e=>eventYearKey(e)===(year===null?'undated':String(year))).map(e=>e.order||0))+1),createdAt:original?.createdAt||dateNow()};
+  const next=original?state.timelineEvents.map(e=>e.id===original.id?changed:e):[...state.timelineEvents,changed];
+  try{
+    if(!(await flush()))throw Error('Please save your character changes first.');
+    await writeTimeline(next,original?'Edit event':'Add event',before,pageUndoKey($('timelineEventDialog').dataset.origin||'timeline'));
+    $('timelineEventDialog').close();
+    if(pageType()==='timeline')renderTimeline();
+    if(pageType()==='editor' && state.active)renderEditor();
+    toast('Timeline event saved to USB.');
+  }catch(e){toast('Could not save event: '+e.message,true);}
+}
+async function deleteTimelineEvent(id){
+  const event=state.timelineEvents.find(e=>e.id===id);if(!event)return;
+  if(!confirm('Delete timeline event “'+event.title+'”? This removes it from every linked character timeline.'))return;
+  try{await writeTimeline(state.timelineEvents.filter(e=>e.id!==id),'Delete event');renderTimeline();}
+  catch(e){toast('Delete failed: '+e.message,true);}
+}
+async function moveTimelineEvent(id,direction){
+  const view=sortedTimelineEvents(state.timelineEvents);
+  const at=view.findIndex(e=>e.id===id);if(at<0)return;
+  const current=view[at],near=view[at+direction];
+  if(!near||eventYearKey(current)!==eventYearKey(near))return;
+  const before=structuredClone(state.timelineEvents);
+  const group=view.filter(e=>eventYearKey(e)===eventYearKey(current));
+  const idx=group.findIndex(e=>e.id===id);if(idx+direction<0||idx+direction>=group.length)return;
+  [group[idx],group[idx+direction]]=[group[idx+direction],group[idx]];
+  const ord=new Map(group.map((e,i)=>[e.id,i]));
+  const next=state.timelineEvents.map(e=>ord.has(e.id)?{...e,order:ord.get(e.id)}:e);
+  try{await writeTimeline(next,'Reorder events',before);renderTimeline();}
+  catch(e){toast('Could not reorder events: '+e.message,true);}
+}
+async function dragTimelineEvent(sourceId,targetId) {
+  if(sourceId===targetId)return;
+  const sorted=sortedTimelineEvents(state.timelineEvents);
+  const source=sorted.find(e=>e.id===sourceId),target=sorted.find(e=>e.id===targetId);
+  if(!source||!target||eventYearKey(source)!==eventYearKey(target)){
+    toast('Change the year first to move an event into another year.',true);return;
+  }
+  const before=structuredClone(state.timelineEvents),group=sorted.filter(e=>eventYearKey(e)===eventYearKey(source));
+  const from=group.findIndex(e=>e.id===sourceId),to=group.findIndex(e=>e.id===targetId);
+  const [removed]=group.splice(from,1);group.splice(to,0,removed);
+  const orders=new Map(group.map((e,i)=>[e.id,i]));
+  try {await writeTimeline(state.timelineEvents.map(e=>orders.has(e.id)?{...e,order:orders.get(e.id)}:e),'Reorder events',before);renderTimeline();}
+  catch(e){toast('Timeline reorder failed: '+e.message,true);}
+}
+function renderTimeline(){
+  if(!state.novel)return;
+  $('timelineViewTitle').textContent=state.novel.name+' · Timeline';
+  const picker=$('timelineCharacterFilter');const previous=state.timelineFilter||'all';picker.replaceChildren();
+  for(const c of state.characters)picker.add(new Option(c.name,c.id));
+  const byCharacter=previous!=='all';
+  if(byCharacter && !state.characters.some(c=>c.id===previous))state.timelineFilter='all';
+  picker.value=state.timelineFilter==='all'?(state.characters[0]?.id||''):state.timelineFilter;
+  $('timelineAllMode').classList.toggle('selected',state.timelineFilter==='all');
+  $('timelineCharacterMode').classList.toggle('selected',state.timelineFilter!=='all');
+  $('timelineFilterWrap').classList.toggle('hidden',state.timelineFilter==='all');
+  const visible=sortedTimelineEvents(state.timelineEvents.filter(e=>state.timelineFilter==='all'||e.characterIds.includes(state.timelineFilter)));
+  $('timelineEventCount').textContent=visible.length+' event'+(visible.length===1?'':'s');
+  const host=$('timelineEntries');host.replaceChildren();
+  if(!visible.length){host.append(el('div','noCharacters',state.timelineFilter==='all'?'No timeline events yet. Add your first event to begin.':'No events linked to this character yet.'));return;}
+  const groups=new Map();for(const e of visible){const key=eventYearKey(e);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(e);}
+  for(const [key,events] of groups){
+    const group=el('section','timelineGroup');group.append(el('h2','timelineYear',key==='undated'?'Relative / Unknown Dates':key));
+    const rail=el('div','timelineRail');
+    for(const event of events){
+      const row=el('div','timelineRow');
+      const bullet=el('span','timelineBullet','');
+      const card=el('div','timelineCard');
+      card.draggable=true;
+      card.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',event.id);e.dataTransfer.effectAllowed='move';});
+      card.addEventListener('dragover',e=>{e.preventDefault();card.classList.add('dragOver');});
+      card.addEventListener('dragleave',()=>card.classList.remove('dragOver'));
+      card.addEventListener('drop',e=>{e.preventDefault();card.classList.remove('dragOver');void dragTimelineEvent(e.dataTransfer.getData('text/plain'),event.id);});
+      card.addEventListener('dragend',()=>document.querySelectorAll('.timelineCard.dragOver').forEach(c=>c.classList.remove('dragOver')));
+      const content=el('button','timelineEventOpen');content.type='button';
+      content.append(el('strong','',event.title));
+      if(event.dateText)content.append(el('span','muted',event.dateText));
+      if(event.notes)content.append(el('span','timelineExcerpt',event.notes.slice(0,160)));
+      const names=event.characterIds.map(id=>state.characters.find(c=>c.id===id)?.name).filter(Boolean);
+      content.append(el('span','timelineTags',names.length?names.join(' · '):'No characters assigned'));
+      content.onclick=()=>openTimelineEventDialog(event.id);
+      const controls=el('div','timelineRowActions');
+      for(const [symbol,d] of [['↑',-1],['↓',1]]){
+        const b=el('button','quiet',symbol);b.type='button';b.title=(d<0?'Move earlier':'Move later')+' within year';
+        const idx=events.indexOf(event);b.disabled=d<0?idx===0:idx===events.length-1;
+        b.onclick=()=>void moveTimelineEvent(event.id,d);controls.append(b);
+      }
+      const remove=el('button','dangerText','×');remove.title='Delete timeline event';remove.onclick=()=>void deleteTimelineEvent(event.id);controls.append(remove);
+      card.append(content,controls);row.append(bullet,card);rail.append(row);
+    }
+    group.append(rail);host.append(group);
+  }
+}
+async function showTimeline(){
+  if(!(await flush()))return;
+  if(!state.novel)return;
+  hideMainViews();cleanGalleryUrls();$('timelineView').classList.remove('hidden');
+  setWorkspaceView('timeline');renderTimeline();
+}
+/* v3.6: USB-only universal search, with no index uploaded anywhere. */
+async function showLibrarySearch(){
+  if(!(await flush()))return;
+  if(!state.writer)return;
+  hideMainViews();cleanGalleryUrls();$('librarySearchView').classList.remove('hidden');
+  setWorkspaceView('search');
+  if($('globalSearchInput').value.trim())await runLibrarySearch();
+}
+function collectSearchableParts(profile){
+  const parts=[['Name',profile.name]];
+  for(const section of sections){
+    const object=profile[section.key]||{};
+    for(const [key,value] of Object.entries(object)){
+      if(key==='links'&&Array.isArray(value)){
+        for(const link of value){parts.push(['Relationship notes',link.notes||'']);}
+      }else if(typeof value==='string')parts.push([section.title+' / '+key,value]);
+    }
+  }
+  return parts;
+}
+async function runLibrarySearch(){
+  const text=$('globalSearchInput').value.trim().toLowerCase();
+  const host=$('searchResults');host.replaceChildren();
+  if(!text){host.append(el('p','muted','Enter a term to search your USB library.'));return;}
+  const token=++state.searchEpoch;host.append(el('p','muted','Searching your USB character and timeline files…'));
+  const matches=[];
+  try{
+    for(const novel of state.novels){
+      const dir=await state.writerDir.getDirectoryHandle(novel.folder);
+      const chars=await dir.getDirectoryHandle('characters');
+      for await (const [name,handle] of chars.entries()){
+        if(handle.kind!=='file'||!name.toLowerCase().endsWith('.json'))continue;
+        const profile=await readJSON(handle);
+        const hit=collectSearchableParts(profile).find(([label,value])=>String(value||'').toLowerCase().includes(text));
+        if(hit){matches.push({kind:'character',novel,profile,match:hit});}
+      }
+      const events=await loadTimelineEvents(dir);
+      for(const event of events){const fields=[['Event',event.title],['Event notes',event.notes],['Date',event.dateText]];
+        const hit=fields.find(([,value])=>String(value).toLowerCase().includes(text));
+        if(hit)matches.push({kind:'event',novel,event,match:hit});
+      }
+    }
+    if(token!==state.searchEpoch||pageType()!=='search')return;
+    host.replaceChildren();
+    host.append(el('p','searchSummary',matches.length+' result'+(matches.length===1?'':'s')+' in '+state.novels.length+' book'+(state.novels.length===1?'':'s')));
+    if(!matches.length)host.append(el('p','muted','Nothing matched. Try another word or phrase.'));
+    for(const result of matches.slice(0,200)){
+      const button=el('button','searchHit');button.type='button';
+      button.append(el('strong','',result.kind==='event'?result.event.title:result.profile.name));
+      button.append(el('span','muted',result.novel.name+' · '+result.match[0]));
+      const value=String(result.match[1]||'');const pos=value.toLowerCase().indexOf(text);
+      button.append(el('span','searchExcerpt',value.slice(Math.max(0,pos-55),pos+text.length+105)));
+      button.onclick=async()=>{await chooseNovel(result.novel.id);if(result.kind==='character')await chooseCharacter(result.profile.id);else{await showTimeline();openTimelineEventDialog(result.event.id);}};
+      host.append(button);
+    }
+    if(matches.length>200)host.append(el('p','muted','Showing first 200 results. Narrow your search for more.'));
+  } catch(e){if(token!==state.searchEpoch)return;host.replaceChildren(el('p','errorText','Search could not complete: '+e.message));}
+}
+/* v3.6: Upload-only book cover. The bitmap stays on the USB in its novel. */
+function cleanCoverUrls(){for(const u of state.coverUrls||[])URL.revokeObjectURL(u);state.coverUrls=[];}
+async function showBookCover(novel, frame){
+  if(!novel.coverFile || !state.writerDir)return;
+  try{
+    const dir=await state.writerDir.getDirectoryHandle(novel.folder);
+    const file=await(await dir.getFileHandle(novel.coverFile)).getFile();
+    if(!frame.isConnected)return;
+    const url=URL.createObjectURL(file);state.coverUrls.push(url);
+    frame.replaceChildren();const img=el('img','uploadedBookImage');img.src=url;img.alt='';frame.append(img);
+  }catch(e){console.warn('Could not load cover:',e);}
+}
+async function uploadBookCover(evt){
+  const file=evt.target.files?.[0];evt.target.value='';if(!file||!state.novel)return;
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>10*1024*1024){toast('Choose a JPG, PNG, or WebP image under 10 MB.',true);return;}
+  if(!(await flush()))return;
+  const novel=state.novel,old=novel.coverFile;
+  const next='cover.'+({'image/png':'png','image/jpeg':'jpg','image/webp':'webp'}[file.type]);
+  try{
+    await putFile(state.novelDir,next,file);
+    const updated={...novel,coverFile:next};delete updated.folder;
+    await putJSON(state.novelDir,'novel.json',updated);
+    novel.coverFile=next;
+    if(old && old!==next){try{await state.novelDir.removeEntry(old);}catch(e){toast('New cover saved, but old cover cleanup failed.',true);}}
+    $('removeCoverBtn').disabled=false;toast('Book cover saved to USB.');
+  }catch(e){toast('Cover upload failed: '+e.message,true);}
+}
+async function removeBookCover(){
+  if(!state.novel?.coverFile)return;
+  if(!confirm('Remove the uploaded book cover? The default cover will be shown again.'))return;
+  const novel=state.novel,previous=novel.coverFile;
+  const clean={...novel,coverFile:null};delete clean.folder;
+  try{await putJSON(state.novelDir,'novel.json',clean);novel.coverFile=null;
+    try{await state.novelDir.removeEntry(previous);}catch(e){toast('Cover hidden, but the old image could not be deleted: '+e.message,true);}
+    $('removeCoverBtn').disabled=true;toast('Restored default book cover.');
+  }catch(e){toast('Could not remove cover: '+e.message,true);}
+}
+/* v3.6: complete tree export, including offscreen manually arranged nodes. */
+function exportTreeSVG(){
+  const connections=treeConnections(),positions=treePositions(connections);
+  const w=Math.max(940,...Object.values(positions).map(p=>Math.ceil(p.x+240)));
+  const nodeHeight=Math.max(340,...Object.values(positions).map(p=>Math.ceil(p.y+150)));
+  const h=nodeHeight+(connections.length?85+connections.length*25:40);
+  const lines=connections.map(edge=>{
+    const a=positions[edge.from],b=positions[edge.to];if(!a||!b)return '';
+    const x1=a.x+90,y1=a.y+48,x2=b.x+90,y2=b.y+48;
+    return `<path d="M${x1} ${y1} C${(x1+x2)/2} ${y1},${(x1+x2)/2} ${y2},${x2} ${y2}" stroke="#91c5fa" stroke-width="3.5" fill="none"/>`;
+  }).join('');
+  const nodes=state.characters.map(c=>{
+    const p=positions[c.id];if(!p)return '';
+    return `<g transform="translate(${p.x} ${p.y})"><rect width="180" height="96" rx="12" fill="#20364e" stroke="#7d9fc7" stroke-width="2"/><text x="14" y="35" fill="#f7faff" font-size="15" font-family="Arial,sans-serif" font-weight="bold">${safeXml(c.name.slice(0,65))}</text><text x="14" y="62" fill="#b8cee5" font-size="12" font-family="Arial,sans-serif">${safeXml((c.story?.role||'Character').slice(0,65))}</text></g>`;
+  }).join('');
+  const legend=connections.length?
+    `<line x1="22" x2="${w-22}" y1="${nodeHeight+8}" y2="${nodeHeight+8}" stroke="#547394" stroke-width="1"/><text x="24" y="${nodeHeight+33}" fill="#e3f0ff" font-family="Arial,sans-serif" font-size="17" font-weight="bold">Relationships</text>`+
+    connections.map((edge,i)=>{
+      const a=state.characters.find(c=>c.id===edge.from),b=state.characters.find(c=>c.id===edge.to);
+      return `<text x="25" y="${nodeHeight+58+i*25}" fill="#cfe2f7" font-family="Arial,sans-serif" font-size="14">${safeXml((a?.name||'?')+' — '+treeTypeName(edge.type)+' — '+(b?.name||'?'))}</text>`;
+    }).join(''):'';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="100%" height="100%" fill="#101a28"/>${lines}${nodes}${legend}</svg>`;
+}
+async function treePNGBlob(){
+  const svg=exportTreeSVG(),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));
+  try{
+    const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('Image could not be rendered'));img.src=url;});
+    const scale=Math.min(2,8192/Math.max(img.width,img.height));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+    if(!blob)throw Error('PNG encoder failed');return blob;
+  }finally{URL.revokeObjectURL(url);}
+}
+async function exportTreePNG(){
+  if(!state.novel||!(await flush()))return;
+  try{const blob=await treePNGBlob();downloadBlob(blob,folderSafe(state.novel.name)+'-character-tree.png');toast('Full character tree exported as PNG.');}
+  catch(e){toast('Tree export failed: '+e.message,true);}
+}
+async function exportTreePDF(){
+  if(!state.novel)return;
+  const popup=window.open('','_blank');
+  if(!popup){toast('Allow popups for the printable PDF.',true);return;}
+  popup.document.write('<p style="font-family:sans-serif;padding:30px">Preparing your tree…</p>');
+  try{
+    if(!(await flush()))throw Error('Save changes first.');
+    const png=await treePNGBlob();const data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(png);});
+    popup.document.open();popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${safeHtml(state.novel.name)} — Character Tree</title><style>@page{size:landscape;margin:.4in}body{font:14px Arial;color:#243346}h1{font-size:19px;margin:0 0 10px}img{display:block;max-width:100%;max-height:85vh;object-fit:contain;margin:auto}@media print{button{display:none}}</style></head><body><h1>${safeHtml(state.novel.name)} — Character Tree</h1><button onclick="window.print()">Print / Save as PDF</button><img src="${data}" alt="Character tree"></body></html>`);popup.document.close();
+    popup.focus();toast('Tree print view opened. Choose Save as PDF in the print dialog.');
+  }catch(e){popup.close();toast('Tree PDF failed: '+e.message,true);}
+}
+
 /* Character export tools. No external libraries or network APIs.
    PDF uses the browser's Print > Save as PDF. Word is a genuine .docx ZIP package. */
 function safeHtml(value) {
@@ -1632,6 +2056,29 @@ async function exportDocx(scope) {
 function init() {
   $('undoBtn').onclick=()=>void undoLast();updateUndoButton();
   $('refreshViewBtn').onclick=()=>void refreshCurrentView();
+  $('globalSearchBtn').onclick=()=>void showLibrarySearch();
+  $('searchShelfBtn').onclick=()=>void showBookshelf();
+  $('runSearchBtn').onclick=()=>void runLibrarySearch();
+  $('globalSearchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void runLibrarySearch();}});
+  $('addTimelineEventBtn').onclick=()=>openTimelineEventDialog();
+  $('timelineEventForm').addEventListener('submit',e=>void saveTimelineEvent(e));
+  $('cancelEventBtn').onclick=()=>$('timelineEventDialog').close();
+  $('closeRevisionsBtn').onclick=()=>$('revisionHistoryDialog').close();
+  $('revisionHistoryBtn').onclick=()=>void showRevisionHistory();
+  $('timelineAllMode').onclick=()=>{state.timelineFilter='all';renderTimeline();};
+  $('timelineCharacterMode').onclick=()=>{state.timelineFilter=state.characters[0]?.id||'all';renderTimeline();};
+  $('timelineCharacterFilter').onchange=e=>{state.timelineFilter=e.target.value;renderTimeline();};
+  $('novelTimelineBtn').onclick=()=>void showTimeline();
+  $('treeTimelineBtn').onclick=()=>void showTimeline();
+  $('editorTimelineBtn').onclick=()=>void showTimeline();
+  $('profileTimelineBtn').onclick=()=>void showTimeline();
+  $('timelineShelfBtn').onclick=()=>void showBookshelf();
+  $('timelineCharsBtn').onclick=()=>void showCharacters();
+  $('timelineTreeBtn').onclick=()=>void showTree();
+  $('coverInput').onchange=e=>void uploadBookCover(e);
+  $('removeCoverBtn').onclick=()=>void removeBookCover();
+  $('exportTreePngBtn').onclick=()=>void exportTreePNG();
+  $('exportTreePdfBtn').onclick=()=>void exportTreePDF();
   $('selectFolderBtn').onclick = selectFolder;
   $('reselectFolderBtn').onclick = selectFolder;
   $('changeFolderBtn').onclick = selectFolder;

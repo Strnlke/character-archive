@@ -13,6 +13,7 @@
     <div class="brand"><span class="brand-icon">✦</span><div><strong>Character Bookshelf</strong><small>Your writing library</small></div></div>
     <div class="topactions">
       <span id="saveStatus" class="status" role="status" aria-live="polite">No folder selected</span>
+      <button id="globalSearchBtn" type="button" class="quiet hidden">⌕ Search library</button>
       <button id="refreshViewBtn" type="button" class="quiet hidden" title="Reload this view from your USB folder without starting over">↻ Refresh view</button>
       <button id="undoBtn" type="button" class="undoTopButton" disabled title="Undo the last reversible action on this page">↶ Undo</button>
       <button id="retrySaveBtn" class="warning hidden" type="button">Retry save</button>
@@ -51,6 +52,7 @@
           <div class="eyebrow">CHARACTER PROFILE</div>
           <button class="sideButton" id="editorBackCharactersBtn" type="button">← All characters</button>
           <button class="sideButton" id="editorTreeBtn" type="button">♧ Character tree</button>
+          <button class="sideButton" id="editorTimelineBtn" type="button">▦ Timeline</button>
           <button class="sideButton" id="editorBackBookshelfBtn" type="button">▤ Bookshelf</button>
         </div>
         <div class="sidebarBlock">
@@ -112,11 +114,14 @@
             <p id="novelViewSubtitle">Your characters</p>
           </div>
           <div class="novelActions">
+            <label class="quiet fileLabel" for="coverInput">↑ Upload cover</label>
+            <input id="coverInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+            <button id="removeCoverBtn" class="quiet" type="button">Remove cover</button>
             <button id="novelViewDeleteBookBtn" class="dangerOutline" type="button">Delete book</button>
             <button id="novelViewNewCharacterBtn" class="primary" type="button">＋ New character</button>
           </div>
         </div>
-        <div class="collectionHeading"><h2>Characters</h2><button id="novelTreeBtn" class="treeNavButton" type="button">♧ Character tree</button><span id="novelCharacterCount" class="count">0</span><div class="spacer"></div><button id="exportPdfNovelBtn" class="quiet" type="button">↓ Export PDF</button><button id="exportDocxNovelBtn" class="quiet" type="button">↓ Export Word</button></div>
+        <div class="collectionHeading"><h2>Characters</h2><button id="novelTreeBtn" class="treeNavButton" type="button">♧ Character tree</button><button id="novelTimelineBtn" class="treeNavButton" type="button">▦ Timeline</button><span id="novelCharacterCount" class="count">0</span><div class="spacer"></div><button id="exportPdfNovelBtn" class="quiet" type="button">↓ Export PDF</button><button id="exportDocxNovelBtn" class="quiet" type="button">↓ Export Word</button></div>
         <div id="characterGallery" class="characterGallery"></div>
       </section>
       <section id="treeView" class="treeView hidden" aria-labelledby="treeViewTitle">
@@ -124,12 +129,12 @@
           <button id="treeShelfBtn" class="textButton" type="button">Bookshelf</button>
           <span class="navSep">/</span>
           <button id="treeCharactersBtn" class="textButton" type="button">All characters</button>
-          <span class="navSep">/</span><span>Character tree</span>
+          <span class="navSep">/</span><span>Character tree</span><span class="navSep">/</span><button id="treeTimelineBtn" class="textButton" type="button">Timeline</button>
         </div>
         <div class="treeHeading">
           <div><p class="pageKicker">RELATIONSHIPS · VISUAL MAP</p><h1 id="treeViewTitle">Character Tree</h1>
             <p id="treeIntro">All characters appear automatically. Connect them through their relationship profiles, then arrange them here.</p></div>
-          <button id="treeAutoLayoutBtn" class="quiet" type="button">↻ Automatic layout</button>
+          <div class="treeHeadingActions"><button id="exportTreePngBtn" class="quiet" type="button">↓ PNG</button><button id="exportTreePdfBtn" class="quiet" type="button">↓ PDF / Print</button><button id="treeAutoLayoutBtn" class="quiet" type="button">↻ Automatic layout</button></div>
         </div>
         <div class="treeInstructions"><span class="treeDot"></span><span>Drag to move; drop a card onto another card to link them. Click a name to open its profile.</span><span id="treeSaveLabel" class="treeSaveLabel">Layout ready</span></div>
         <div id="treeViewport" class="treeViewport" tabindex="0" aria-label="Scrollable character relationship tree">
@@ -147,6 +152,20 @@
           <p class="treeFootnote">You can link one character to any number of characters. For directional relationships, “parent of” means the first character is the parent of the selected characters. Relationships and notes stay in the characters’ USB JSON files; dragged positions are saved separately in this novel’s <code>character-tree.json</code>.</p>
         </div>
       </section>
+      <section id="timelineView" class="timelineView hidden" aria-labelledby="timelineViewTitle">
+        <div class="profileNav"><button id="timelineShelfBtn" class="textButton" type="button">Bookshelf</button><span class="navSep">/</span><button id="timelineCharsBtn" class="textButton" type="button">All characters</button><span class="navSep">/</span><button id="timelineTreeBtn" class="textButton" type="button">Character tree</button><span class="navSep">/</span><span>Timeline</span></div>
+        <div class="novelHeading"><div><p class="pageKicker">STORY CHRONOLOGY</p><h1 id="timelineViewTitle">Timeline</h1><p>Events added in character profiles appear here automatically. Add your own events, choose the people involved, and set the order.</p></div><button id="addTimelineEventBtn" type="button" class="primary">＋ Add Event</button></div>
+        <div class="timelineToolbar"><div class="timelineModes"><button id="timelineAllMode" type="button" class="timelineMode selected">All Characters</button><button id="timelineCharacterMode" type="button" class="timelineMode">By Character</button></div><label id="timelineFilterWrap" class="hidden">Character <select id="timelineCharacterFilter"></select></label><span id="timelineEventCount" class="count"></span></div>
+        <div id="timelineEntries" class="timelineEntries"></div>
+        <p class="timelineTip">Date is optional. Events with known years are grouped chronologically; within a year, use the arrows to change the order. Relative or undated events are kept in a separate group. No story events are generated from freeform notes automatically.</p>
+      </section>
+      <section id="librarySearchView" class="librarySearchView hidden" aria-labelledby="librarySearchTitle">
+        <div class="profileNav"><button id="searchShelfBtn" class="textButton" type="button">Bookshelf</button><span class="navSep">/</span><span>Search library</span></div>
+        <p class="pageKicker">WRITER LIBRARY</p><h1 id="librarySearchTitle">Universal Search</h1>
+        <p>Search character names, profile fields, notes, relationships, and timeline events across this writer's books.</p>
+        <div class="searchBar"><input id="globalSearchInput" type="search" placeholder="Search characters and events…" aria-label="Search across this writer's library"><button id="runSearchBtn" type="button" class="primary">Search</button></div>
+        <div id="searchResults" class="searchResults"><p class="muted">Enter a term to start searching your USB library.</p></div>
+      </section>
       <div id="emptyView" class="emptyView">
         <div class="bigGlyph">✦</div>
         <h1 id="emptyTitle">Your writing library</h1>
@@ -162,6 +181,7 @@
           <button id="profileNovelBtn" class="textButton" type="button">All characters</button>
           <span class="navSep">/</span>
           <button id="profileTreeBtn" class="textButton" type="button">Character tree</button>
+          <span class="navSep">/</span><button id="profileTimelineBtn" class="textButton" type="button">Timeline</button>
           <span class="navSep">/</span>
           <span id="profileNavName" class="navNow">Character</span>
         </div>
@@ -177,7 +197,7 @@
               <button id="removePortraitBtn" type="button" class="textButton">Remove portrait</button>
             </div>
           </div>
-          <button id="deleteCharacterBtn" class="dangerText" type="button">Delete character</button>
+          <div class="profileHeaderActions"><button id="revisionHistoryBtn" class="quiet" type="button">↶ Revision history</button><button id="deleteCharacterBtn" class="dangerText" type="button">Delete character</button></div>
         </div>
         <div id="sections"></div>
       </section>
@@ -221,6 +241,16 @@
       <p class="helper">The dragged card returns to its original position so cards don't overlap. Connections save to the USB folder.</p>
     </div>
   </dialog>
+  <dialog id="timelineEventDialog" class="timelineEventDialog" aria-labelledby="timelineDialogHeading">
+    <form id="timelineEventForm" class="dialogBody">
+      <h2 id="timelineDialogHeading">Add Timeline Event</h2>
+      <div class="timelineFormGrid"><label class="wide">Event title<input id="eventTitleInput" maxlength="180" required placeholder="Event title"></label><label>Year (optional)<input id="eventYearInput" type="number" min="-9999" max="9999" placeholder="2008"></label><label>Date or relative time<input id="eventDateInput" maxlength="100" placeholder="July 12, or three days later"></label></div>
+      <fieldset class="eventCharacterField"><legend>Characters involved (choose any)</legend><div id="eventCharacterChoices" class="eventCharacterChoices"></div></fieldset>
+      <label>Event notes<textarea id="eventNotesInput" rows="4" placeholder="Describe this event…"></textarea></label>
+      <div class="dialogActions"><button id="cancelEventBtn" type="button" class="quiet">Cancel</button><button class="primary" type="submit">Save event</button></div>
+    </form>
+  </dialog>
+  <dialog id="revisionHistoryDialog" class="revisionHistoryDialog" aria-labelledby="revisionHistoryHeading"><div class="dialogBody"><h2 id="revisionHistoryHeading">Character Revision History</h2><p class="helper">Saved snapshots from earlier editing sessions. Restoring a revision first backs up your current profile.</p><div id="revisionHistoryList" class="revisionHistoryList"></div><div class="dialogActions"><button id="closeRevisionsBtn" type="button" class="quiet">Close</button></div></div></dialog>
   <div id="toast" class="toast hidden" role="alert"></div>
 </body>
 </html>
