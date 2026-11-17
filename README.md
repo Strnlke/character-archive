@@ -1,45 +1,72 @@
-# Character Archive — GitHub Pages + personal OneDrive
+# Character Archive v3 — USB library, bookshelf, and exports
 
-A dark-themed, browser-based character profile manager. Every novel is a folder in the application's **OneDrive app folder**. Each character is an individual JSON file; portraits live in a separate Portraits folder. No server, database subscription, API key, or purchased domain is required.
+A dark-themed character manager hosted on GitHub Pages. Profiles are stored as separate JSON files in a USB folder that you select when opening the app. No cloud sign-in, server-side storage, or subscription is involved.
 
-## 1. Publish the app on GitHub Pages
+## New startup behavior
 
-1. In GitHub, make a **new public repository**, for example `character-archive`.
-2. Upload `index.html`, `styles.css`, and `app.js` at the repository root, then commit.
-3. Open **Settings → Pages → Build and deployment → Deploy from a branch**. Select `main` and `/ (root)`, then Save.
-4. Your address will be similar to `https://YOURUSERNAME.github.io/character-archive/`. Wait for the live Pages link and open it. The source code in a public repository is public; **do not upload story notes, passwords, or any secret**. All profiles will be saved in your private OneDrive.
+1. Insert the USB drive and open Character Archive in **desktop Edge or Chrome** using your HTTPS GitHub Pages URL.
+2. Click **Select location** and choose the flash drive itself (or any parent folder on it).
+3. Character Archive will create or reuse a folder named **Character Archive** in that location.
+4. Select or create a writer, such as Aaron or Lindsay. Each writer's books and characters live in that writer's folder.
+5. Every time you reopen the website, you select the drive/folder again. The app intentionally does **not** silently reconnect.
 
-## 2. Register Microsoft sign-in
+Example:
 
-1. Visit [Microsoft Entra admin center](https://entra.microsoft.com/), then **Identity → Applications → App registrations → New registration**. Your personal Microsoft account may not have permission to register an app in a tenant. If so, you may need a separate free Entra tenant or a different account to register the app, while still signing into the finished app with your **personal Microsoft account**. This is an account-dependent setup constraint.
-2. Name it `Character Archive`.
-3. **Supported account types**: select **Personal Microsoft accounts only** (if available), or the option that includes personal Microsoft accounts.
-4. Under **Authentication → Add a platform**, choose **Single-page application (SPA)**. Enter the *exact* GitHub Pages address, including the ending `/`. Do not choose the “Web” platform.
-5. Under **API permissions → Add a permission → Microsoft Graph → Delegated permissions**, add `Files.ReadWrite.AppFolder`. This permission is presently marked **preview** by Microsoft. Depending on the app registration experience it may require an additional consent step. Do **not** create a client secret.
-6. Copy the **Application (client) ID** shown on the app's Overview page.
-7. Open your hosted Character Archive, choose **App setup**, paste the client ID, and check that its displayed redirect URI matches the one in Entra. Then **Connect OneDrive**, consent, and start a novel.
+```text
+USB DRIVE/
+└── Character Archive/
+    ├── character-archive-manifest.json
+    ├── Aaron/
+    │   ├── Don't Wake the Girls/
+    │   │   ├── novel.json
+    │   │   ├── characters/
+    │   │   │   └── Jake--<unique-id>.json
+    │   │   └── portraits/
+    │   └── Stern Lake/
+    └── Lindsay/
+        └── (her novels, character files, portraits)
+```
 
-**If the AppFolder preview permission is unavailable or fails on your account:** Stop and check the permission/consent error. This version deliberately does not silently request the broader `Files.ReadWrite` permission. We can adapt it consciously if necessary.
+### Existing libraries are preserved
 
-## 3. How it stores data
+**If you directly select your existing library folder containing `character-archive-manifest.json`, the app opens it exactly as-is.** It does **not** create `Character Archive/Character Archive` or move, delete, or rename existing JSON files. If you select the parent of an already-named `Character Archive` folder, the app reuses that existing folder.
 
-OneDrive → Apps → Character Archive (app-registration display name) → `<Novel title>` → `Characters` → `<Character name>--<ID>.json`; images are in `<Novel title>/Portraits/`.
+If your old library is stored directly in the root of a flash drive, the app opens that old layout without moving it. To reorganize under `Character Archive/`, first back up the library, then manually move the old manifest and each writer folder together into a newly created `Character Archive` folder using Windows File Explorer. Do not leave the manifest behind or move writer folders separately.
 
-Each novel has separate folders. The app stores files using Microsoft's Graph API with delegated consent and uses `If-Match` on existing character files to detect cloud version conflicts.
+If an existing folder named `Character Archive` contains content but no valid manifest, the app refuses to initialize it automatically to avoid overwriting/confusing other files.
 
-## 4. Limitations to know
+## Navigation
 
-- **Sign-in and cloud features need internet and a deployed HTTPS site** (or a localhost development server). Double-clicking `index.html` locally is not sufficient for Microsoft OAuth.
-- Autosave occurs after a short typing pause. Wait until **Saved to OneDrive** before closing the tab or using a second computer. Do not edit the same character simultaneously on two computers.
-- If a conflict occurs, edits remain in the current browser session until reload; copy your edits before refreshing.
-- The **Export profiles** button exports JSON for the *currently loaded novel*, not all novels and not portrait images. It is a reference/export, **not a complete restorable backup**. To back up everything, copy the application's folder directly in OneDrive, including Portraits.
-- Character links are shown in both profiles, but **relationship descriptions are separate notes on each profile**. Removing a link on one profile doesn't automatically erase the other character's own link.
-- Removing a portrait from the profile does not delete its old image from OneDrive; the app prioritizes safe preservation over aggressive cloud cleanup.
-- Portraits: PNG/JPEG/WebP, max 5 MB each.
-- Microsoft authentication is handled client-side with the official MSAL Browser library from jsDelivr. Network access to this CDN is required to initially load sign-in. All data requests go straight from the browser to Microsoft Graph.
+- **Bookshelf:** Full-width book covers, no redundant sidebar; **Switch writer** is in the top bar.
+- **All Characters:** Full-width character cards and a back-to-bookshelf link.
+- **Character Profile:** The dark sidebar is a table of contents for jumping between the six character sections. It also provides one-character exports and links back to All Characters or the Bookshelf.
+- **Current novel exports:** On the All Characters page, use **Export PDF** or **Export Word** to export all characters in one document.
 
-## Documentation
+## Exports
 
-- https://learn.microsoft.com/en-us/graph/onedrive-sharepoint-appfolder
-- https://learn.microsoft.com/en-us/graph/auth-register-app-v2
-- https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site
+- **PDF (single character or whole novel):** Opens a clean printable document in a new browser tab, then invokes the browser Print dialog. Choose **Save as PDF** as the destination. Your browser may ask you to allow pop-ups on your site.
+- **Word (single character or whole novel):** Downloads an editable `.docx` file. No Word installation is required to create it, but Word or a compatible editor is needed to open/edit it. Optional portraits are included when the source image can be read.
+- Export files go wherever the browser downloads them, or the print dialog saves them. The editable source JSON files stay on the USB drive and are not changed by exporting.
+- **Back up library** still copies the whole library (writers, characters, portraits) to a separate folder that you choose.
+
+## Update your GitHub Pages app
+
+1. **Back up your working USB library first** using Windows File Explorer (copy the folder containing `character-archive-manifest.json` to a second location).
+2. Extract this ZIP.
+3. Open the GitHub repository hosting your current USB app (previously `usb-test`).
+4. Replace the repository root's **`index.html`, `app.js`, `styles.css`** with the new versions and commit. You can upload `README.md` too.
+5. When GitHub Pages has deployed, refresh your website with Ctrl+Shift+R.
+6. For the first test, select a **new empty test location** on the flash drive. Verify that Character Archive creates a named folder and that a sample writer/novel/character survives closing and reopening.
+7. Only then select your existing live library. Don't upload your writer data or character JSON files to the public GitHub repository.
+
+## Browser and save safety
+
+- Use desktop Edge or Chrome on an HTTPS GitHub Pages site or localhost. The browser File System Access API requires a secure context and user-initiated folder selection.
+- The application does not scan USB drives automatically; you choose the location.
+- Wait until **Saved to folder** before closing the page or unplugging the drive.
+- On a write error, use **Retry save** or **Download unsaved profile**.
+- Writer profiles are organizational, not password-protected. Anyone with access to the USB files can read them.
+
+## Verification
+
+In a simulated Chromium File System Access test, this version created the named application folder and a writer/novel/character hierarchy, saved and reloaded character details, reused an existing library without nesting, navigated between the bookshelf/gallery/editor, generated Word downloads for an individual character and a whole novel, and generated a print-ready character PDF. Sample `.docx` exports were reopened with a document reader and rendered to visually inspected pages. No real USB-drive testing has yet been performed on **this updated v3 build**; your previous version passed that real-device test.

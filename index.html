@@ -1,12 +1,165 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#0b1018"><title>Character Archive</title><link rel="stylesheet" href="styles.css"><script defer src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.4/lib/msal-browser.min.js"></script><script defer src="app.js"></script></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1018">
+  <title>Character Archive · Bookshelf</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
 <body>
-<div class="app">
-<header class="top"><div class="brand"><span class="brandmark">✦</span><div><strong>Character Archive</strong><small>Writer's workspace</small></div></div><div class="topactions"><span id="syncStatus" class="status">Not connected</span><button id="exportBtn" class="subtle" disabled>Export profiles</button><button id="signinBtn" class="primary">Connect OneDrive</button></div></header>
-<div class="shell"><aside class="sidebar"><div class="sidehead"><label for="novelSelect">CURRENT NOVEL</label><select id="novelSelect" disabled><option>Connect to begin</option></select><button id="addNovelBtn" class="sidebutton" disabled>＋ New novel</button></div><div class="sidehead listhead"><div class="rowbetween"><label>CHARACTERS</label><span id="charCount" class="muted">0</span></div><input id="searchInput" type="search" placeholder="Search characters…" disabled><button id="addCharBtn" class="sidebutton" disabled>＋ New character</button></div><div id="characterList" class="characterList"></div><div class="sidefoot">Your profiles stay in your personal OneDrive.<br>One novel per folder · One JSON per character</div></aside>
-<main class="main"><div id="welcome" class="welcome"><div class="welcomeIcon">✦</div><h1>Every character has a story.</h1><p>Keep their histories, personalities, relationships, and story details together in one private OneDrive library.</p><button id="welcomeConnect" class="primary big">Connect Microsoft account</button><p class="hint">First time? Choose <b>App setup</b> and enter your Microsoft application (client) ID.</p><button id="setupBtn" class="textbutton">App setup</button></div>
-<div id="editor" class="hidden"><div class="profilehead"><div id="portrait" class="portrait" role="img" aria-label="Character portrait"><span>◉</span></div><div class="identity"><label class="eyebrow">CHARACTER PROFILE</label><h1 id="charTitle">Character</h1><span id="updatedAt" class="muted"></span><div class="portraitActions"><label class="filebutton" for="portraitInput">Upload portrait</label><input type="file" id="portraitInput" accept="image/png,image/jpeg,image/webp" hidden><button id="removePortraitBtn" class="textbutton">Remove portrait</button></div></div><button id="deleteCharBtn" class="dangertext">Delete character</button></div><div id="sections"></div></div></main></div></div>
-<dialog id="setupDialog"><form method="dialog" class="dialogBody"><h2>Connect Microsoft OneDrive</h2><p>Register a <b>single-page application</b> in Microsoft Entra, then paste its <b>Application (client) ID</b> below. No passwords or client secrets are needed.</p><label for="clientId">Application (client) ID</label><input id="clientId" autocomplete="off" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"><label>Redirect URI to register as SPA</label><div class="copyline"><code id="redirectUri"></code><button id="copyRedirect" type="button" class="subtle">Copy</button></div><p class="hint">Supported account types: personal Microsoft accounts. Add delegated Microsoft Graph permission <code>Files.ReadWrite.AppFolder</code> (and optionally <code>User.Read</code>), then grant consent at sign-in. This app uses only its designated OneDrive app folder.</p><div class="actions"><button value="cancel" class="subtle">Cancel</button><button id="saveSetup" value="save" class="primary">Save settings</button></div></form></dialog>
-<dialog id="promptDialog"><form method="dialog" class="dialogBody"><h2 id="promptTitle"></h2><label id="promptLabel" for="promptInput"></label><input id="promptInput" required maxlength="100"><p id="promptHelp" class="hint"></p><div class="actions"><button value="cancel" class="subtle">Cancel</button><button id="promptConfirm" value="ok" class="primary">Create</button></div></form></dialog>
-<div id="toast" role="alert" class="toast hidden"></div>
-</body></html>
+  <header class="topbar">
+    <div class="brand"><span class="brand-icon">✦</span><div><strong>Character Archive</strong><small>Your writing library</small></div></div>
+    <div class="topactions">
+      <span id="saveStatus" class="status" role="status" aria-live="polite">No folder selected</span>
+      <button id="retrySaveBtn" class="warning hidden" type="button">Retry save</button>
+      <button id="downloadUnsavedBtn" class="quiet hidden" type="button">Download unsaved profile</button>
+      <button id="topSwitchWriterBtn" class="quiet hidden" type="button">⇄ Switch writer</button>
+      <button id="backupBtn" class="quiet hidden" type="button">Back up library</button>
+      <button id="changeFolderBtn" class="quiet hidden" type="button">Change folder</button>
+    </div>
+  </header>
+
+  <section id="startup" class="startup">
+    <div class="startcard" id="folderStep">
+      <div class="stepIcon">▣</div>
+      <p class="eyebrow">STEP 1 OF 2</p>
+      <h1>Choose where to keep Character Archive</h1>
+      <p>Select your flash drive or a folder on it. The app creates a <strong>Character Archive</strong> folder there, containing each writer’s library. You will select a location again each time you start the app.</p>
+      <button class="primary large" id="selectFolderBtn" type="button">Select location</button>
+      <p class="helper">Runs in Chrome or Edge on HTTPS or localhost. Your files stay in a Character Archive folder on the selected drive—no OneDrive or Microsoft sign-in.</p>
+      <p id="folderError" class="errorText hidden" role="alert"></p>
+    </div>
+    <div class="startcard hidden" id="writerStep">
+      <div class="eyebrow">STEP 2 OF 2</div>
+      <h1>Who's writing?</h1>
+      <p>Library folder: <strong id="folderName"></strong></p>
+      <div class="writergrid" id="writerGrid"></div>
+      <button id="newWriterBtn" type="button" class="quiet wide">＋ Create writer profile</button>
+      <p class="helper">Writer profiles organize files; they are not password-protected accounts.</p>
+      <button id="reselectFolderBtn" type="button" class="textButton">Choose a different folder</button>
+    </div>
+  </section>
+
+  <div id="workspace" class="workspace hidden">
+    <aside class="sidebar">
+      <div id="editorSideTools" class="editorSideTools">
+        <div class="sidebarBlock">
+          <div class="eyebrow">CHARACTER PROFILE</div>
+          <button class="sideButton" id="editorBackCharactersBtn" type="button">← All characters</button>
+          <button class="sideButton" id="editorBackBookshelfBtn" type="button">▤ Bookshelf</button>
+        </div>
+        <div class="sidebarBlock">
+          <div class="eyebrow">JUMP TO SECTION</div>
+          <button type="button" class="sideButton" data-jump="basic">Basic Information</button>
+          <button type="button" class="sideButton" data-jump="personality">Personality</button>
+          <button type="button" class="sideButton" data-jump="background">Background</button>
+          <button type="button" class="sideButton" data-jump="relationships">Relationships</button>
+          <button type="button" class="sideButton" data-jump="story">Story Information</button>
+          <button type="button" class="sideButton" data-jump="freeform">Freeform Notes</button>
+        </div>
+        <div class="sidebarBlock">
+          <div class="eyebrow">EXPORT THIS CHARACTER</div>
+          <button id="exportPdfCharacterBtn" class="sideButton" type="button">↓ PDF / Print</button>
+          <button id="exportDocxCharacterBtn" class="sideButton" type="button">↓ Word (.docx)</button>
+        </div>
+      </div>
+      <div class="sidebarLibraryTools">
+      <div class="sidebarBlock">
+        <div class="eyebrow">WRITER</div>
+        <div class="writerHeading"><span class="writerAvatar" id="writerInitial">A</span><strong id="currentWriter">Writer</strong></div>
+        <button id="bookshelfBtn" class="sideButton bookshelfNav" type="button">▤ My bookshelf</button>
+        <button id="switchWriterBtn" class="sideButton" type="button">⇄ Switch writer</button>
+      </div>
+      <div class="sidebarBlock">
+        <label class="eyebrow" for="novelSelect">CURRENT NOVEL</label>
+        <select id="novelSelect"></select>
+        <button id="novelCharactersBtn" class="sideButton" type="button">☷ All characters</button>
+        <button id="newNovelBtn" class="sideButton" type="button">＋ New novel</button>
+      </div>
+      <div class="sidebarBlock">
+        <div class="between"><label class="eyebrow" for="searchInput">CHARACTERS</label><span class="count" id="characterCount">0</span></div>
+        <input id="searchInput" type="search" placeholder="Search characters…">
+        <button id="newCharacterBtn" class="sideButton" type="button">＋ New character</button>
+      </div>
+      <div id="characterList" class="characterList"></div>
+      <div class="sidebarFooter">Files are saved in your selected folder.<br>Unplug your drive only after you see <strong>Saved</strong>.</div>
+      </div>
+    </aside>
+    <main class="mainPanel">
+      <section id="bookshelfView" class="bookshelfView hidden" aria-labelledby="shelfTitle">
+        <div class="pageKicker">YOUR PERSONAL LIBRARY</div>
+        <div class="shelfHeading">
+          <div>
+            <h1 id="shelfTitle">Your Bookshelf</h1>
+            <p id="shelfSubtitle">Your novels, characters, and stories in one place.</p>
+          </div>
+          <button id="bookshelfNewNovelBtn" class="primary" type="button">＋ New novel</button>
+        </div>
+        <div id="shelfBooks" class="shelfBooks"></div>
+        <div class="shelfHelp">Select a book to open its character collection. Your work remains in the folder you selected.</div>
+      </section>
+      <section id="novelView" class="novelView hidden" aria-labelledby="novelViewTitle">
+        <button id="novelBackToShelfBtn" class="textButton pageBack" type="button">← Back to bookshelf</button>
+        <div class="pageKicker" id="novelViewKicker">NOVEL</div>
+        <div class="novelHeading">
+          <div>
+            <h1 id="novelViewTitle">Novel</h1>
+            <p id="novelViewSubtitle">Your characters</p>
+          </div>
+          <button id="novelViewNewCharacterBtn" class="primary" type="button">＋ New character</button>
+        </div>
+        <div class="collectionHeading"><h2>Characters</h2><span id="novelCharacterCount" class="count">0</span><div class="spacer"></div><button id="exportPdfNovelBtn" class="quiet" type="button">↓ Export PDF</button><button id="exportDocxNovelBtn" class="quiet" type="button">↓ Export Word</button></div>
+        <div id="characterGallery" class="characterGallery"></div>
+      </section>
+      <div id="emptyView" class="emptyView">
+        <div class="bigGlyph">✦</div>
+        <h1 id="emptyTitle">Your writing library</h1>
+        <p id="emptyDescription">Create a novel to get started.</p>
+        <button id="emptyAction" class="primary" type="button">Create a novel</button>
+      </div>
+      <section id="editor" class="editor hidden">
+        <div class="profileNav">
+          <button id="profileShelfBtn" class="textButton" type="button">Bookshelf</button>
+          <span class="navSep">/</span>
+          <span id="profileBookName" class="navBook">Novel</span>
+          <span class="navSep">/</span>
+          <button id="profileNovelBtn" class="textButton" type="button">All characters</button>
+          <span class="navSep">/</span>
+          <span id="profileNavName" class="navNow">Character</span>
+        </div>
+        <div class="characterHeader">
+          <div class="portrait" id="portrait" aria-label="Character portrait"><span class="silhouette">♟</span></div>
+          <div class="characterTitle">
+            <div class="eyebrow">CHARACTER PROFILE</div>
+            <h1 id="characterName">Character</h1>
+            <div class="timestamp" id="lastSavedLabel"></div>
+            <div class="portraitActions">
+              <label class="quiet fileLabel" for="portraitInput">Upload portrait</label>
+              <input id="portraitInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
+              <button id="removePortraitBtn" type="button" class="textButton">Remove portrait</button>
+            </div>
+          </div>
+          <button id="deleteCharacterBtn" class="dangerText" type="button">Delete character</button>
+        </div>
+        <div id="sections"></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="nameDialog">
+    <form method="dialog" id="nameForm" class="dialogBody">
+      <h2 id="nameDialogTitle">New item</h2>
+      <label id="nameDialogLabel" for="nameInput">Name</label>
+      <input id="nameInput" maxlength="100" required autocomplete="off">
+      <p id="nameDialogHint" class="helper"></p>
+      <div class="dialogActions">
+        <button value="cancel" class="quiet" type="button" id="cancelNameBtn">Cancel</button>
+        <button value="ok" class="primary" type="submit">Create</button>
+      </div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast hidden" role="alert"></div>
+</body>
+</html>
