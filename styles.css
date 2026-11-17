@@ -57,3 +57,23 @@
 .collectionHeading .spacer{flex:1}
 .collectionHeading .quiet{font-size:12px;padding:8px 10px;white-space:nowrap}
 @media(max-width:750px){.workspace.editorMode .sidebar{height:auto;position:static}.workspace.galleryMode .mainPanel{padding:21px 15px}.editorSideTools .sidebarBlock:nth-child(2){display:none}.collectionHeading{flex-wrap:wrap}.collectionHeading .spacer{display:none}}
+
+/* v3.2: deliberate, confirmed deletion of characters and books */
+.novelActions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px}
+.dangerOutline{background:#2b1d27;color:#ffd2d6;border:1px solid #87505b;border-radius:8px;padding:10px 13px;font-weight:650}
+.dangerOutline:hover{background:#492631;border-color:#b76e7b}
+.bookTile{position:relative;display:flex;flex:0 1 155px;min-width:88px;max-width:155px}
+.bookTile>.bookCover{width:100%;min-width:0;max-width:none;flex:1}
+.bookDeleteBtn,.characterDeleteBtn{position:absolute;z-index:3;right:7px;top:7px;width:29px;height:29px;background:#111d2aee;color:#ffd2d7;border:1px solid #af7c85;border-radius:7px;display:grid;place-items:center;font-weight:800;font-size:19px;line-height:1;box-shadow:0 2px 9px #0009}
+.bookDeleteBtn:hover,.characterDeleteBtn:hover{background:#6d2c3c;color:#fff;border-color:#e9a9b5}
+.characterTile{position:relative;min-width:0}
+.characterTile>.characterCard{width:100%;height:100%}
+.deleteDialog{width:min(94vw,510px);padding:0;border:1px solid #85505b}
+.deleteDialogBody{padding:24px}
+.deleteDialog h2{font-size:23px;margin:7px 0 12px}
+.deleteDialog p{color:#d9e4f2;line-height:1.6}
+.deleteWarningIcon{height:34px;width:34px;display:grid;place-items:center;border-radius:100%;background:#602d3c;color:#ffe2e5;font-weight:900;font-size:21px}
+.deleteWarningText{background:#301f2a;border:1px solid #684253;border-radius:8px;padding:12px;color:#ffcbd0!important;font-size:12px}
+.dangerConfirm{background:#af384d;color:#fff;border:1px solid #ce5a69;border-radius:8px;padding:10px 14px;font-weight:750}
+.dangerConfirm:hover{background:#c7485d}
+@media(max-width:750px){.bookTile{min-width:69px}.novelActions{gap:6px}.novelActions>*{font-size:12px;padding:8px 9px}}

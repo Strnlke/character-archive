@@ -1,22 +1,24 @@
-# Character Bookshelf — Name Update (v3.1)
+# Character Bookshelf v3.2 — Delete with confirmation
 
-This release renames **Character Archive** to **Character Bookshelf**. The bookshelf, writer profiles, all-characters gallery, editor, USB autosave, and PDF/Word exports are otherwise unchanged.
+This update adds **Delete book** (on bookshelves and inside a novel) and **Delete character** (on the character gallery and profile editor). Both actions show an **“Are you sure?”** warning with a separate **Cancel** button, and do nothing unless explicitly confirmed.
 
-## Updating your GitHub Pages app
+## IMPORTANT: Before upgrading
 
-1. Make a copy of your existing USB library before updating.
-2. Extract this ZIP file.
-3. In the GitHub repository that hosts your working USB app (your `usb-test` repository, if it is still your active one), replace `index.html`, `app.js`, and `styles.css` with the new files. You may also upload this README.
-4. Commit and wait for GitHub Pages to finish publishing, then refresh using Ctrl+Shift+R.
-5. Insert your flash drive, select its folder again, and verify your writer profiles and characters load. **Don't delete or rename your existing data folder.**
+1. **Back up your USB library** to a second location first. Deleting a book permanently removes its entire novel folder, including all characters, portraits, notes, and other files inside it. Deleting a character removes that character's JSON profile and its portrait if available.
+2. Extract this ZIP. Upload and replace `index.html`, `app.js`, `styles.css` in your existing GitHub Pages repository (such as `usb-test`). Commit the files. You can upload this README too.
+3. Refresh with Ctrl+Shift+R. Select your existing USB library as normal. **No data migration or renaming is needed.**
+4. **Try deletions with a test book and test character first**, not important writing data. The browser has to be able to delete files from your chosen USB folder.
 
-## Folder names and compatibility
+## How to delete
 
-- For a new empty drive/location, the app creates a folder named **Character Bookshelf**.
-- Existing USB folders named **Character Archive** are automatically recognized and opened **without moving or renaming files** when you select their parent location. You can also select the existing folder directly.
-- If both a `Character Bookshelf` and `Character Archive` folder are present under the selected location, the app asks you to choose the correct library folder directly instead of guessing.
-- Internally, the manifest file remains `character-archive-manifest.json`, with the same JSON format. **This is intentional for compatibility**, even though the displayed app name is Character Bookshelf.
+- **Book:** Use the little × in a book cover's upper-right corner on the bookshelf, or **Delete book** on the novel's All Characters page. The warning says that all files inside that book's folder will be removed.
+- **Character:** Use the × on a character card in All Characters, or **Delete character** in the profile editor. The warning names the character and explains that its profile and portrait will be removed.
+- **Cancel, Esc, or closing the dialog:** Nothing is deleted.
+
+If file deletion fails, the app reports failure rather than claiming success. A failed **recursive book deletion** can leave a partially deleted folder if USB access is interrupted; inspect the folder before retrying. USB file deletions generally bypass the Recycle Bin.
+
+This version preserves the existing folder structure (including legacy `Character Archive` folders), writer profiles, novels, profile schemas, auto-save, navigation, and PDF/Word exports. Links to deleted characters in other profile JSON files may remain as invisible references; those files are not rewritten by deletion.
 
 ## Verification
 
-In a simulated Chromium environment, the renamed app created the new folder, saved and reloaded a character, reopened a preexisting Character Archive library without creating a new folder, safely handled ambiguous folders, and produced Word/PDF exports with the updated app name. The updated build has not yet been tested with your physical USB drive.
+Automated Chromium tests cover confirmation and cancellation, removal of character files/portraits and entire novel folders, preservation of other writers and novels, reloading from USB-like storage, and failure reporting. This build must still be verified on an actual USB flash drive in Chrome/Edge.

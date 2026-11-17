@@ -391,6 +391,7 @@ function cleanGalleryUrls() {
   state.galleryUrls = [];
 }
 function makeBook(novel, index) {
+  const tile = el('div', 'bookTile');
   const button = el('button', 'bookCover bookVariant' + (index % 6));
   button.type = 'button';
   button.setAttribute('aria-label', 'Open ' + novel.name + ' characters');
@@ -398,7 +399,13 @@ function makeBook(novel, index) {
   cover.append(el('span', 'bookOrnament', '✦'), el('span','bookTitle',novel.name), el('span','bookFooter','CHARACTER COLLECTION'));
   button.append(cover);
   button.addEventListener('click', () => void chooseNovel(novel.id));
-  return button;
+  const remove = el('button', 'bookDeleteBtn', '×');
+  remove.type = 'button';
+  remove.title = 'Delete book: ' + novel.name;
+  remove.setAttribute('aria-label', 'Delete book ' + novel.name);
+  remove.addEventListener('click', () => void deleteBook(novel.id));
+  tile.append(button, remove);
+  return tile;
 }
 async function showBookshelf() {
   if (!(await flush())) { toast('Please save your changes before returning to your bookshelf.', true); return; }
@@ -444,6 +451,7 @@ async function showCharacters() {
   }
   const epoch = state.epoch;
   for (const character of state.characters) {
+    const tile = el('div','characterTile');
     const button = el('button','characterCard'); button.type='button';
     const frame = el('span','galleryPortrait');
     frame.append(el('span','gallerySilhouette','♟'));
@@ -453,7 +461,13 @@ async function showCharacters() {
     if (role) body.append(el('span','galleryRole',role));
     button.append(frame,body);
     button.addEventListener('click',()=> void chooseCharacter(character.id));
-    host.append(button);
+    const remove = el('button', 'characterDeleteBtn', '×');
+    remove.type = 'button';
+    remove.title = 'Delete character: ' + character.name;
+    remove.setAttribute('aria-label', 'Delete character ' + character.name);
+    remove.addEventListener('click', () => void deleteCharacter(character.id));
+    tile.append(button, remove);
+    host.append(tile);
     if (character.portraitFile && state.portraitsDir) {
       // Portraits are optional. A missing file leaves the silhouette in place.
       void (async()=>{
@@ -640,17 +654,101 @@ async function removePortrait() {
   queueSave();
   if (await flush()) await renderPortrait(state.active);
 }
-async function deleteCharacter() {
-  const character = state.active;
-  if (!character || !confirm(`Permanently delete ${character.name} from the USB folder? Backups are not affected.`)) return;
-  if (!(await flush())) return;
+// Never delete a file merely because a small icon was clicked. Both actions
+// require a second, explicitly named confirmation. Escape and Cancel do nothing.
+let deleteInProgress = false;
+function confirmDeletion(kind, name, details) {
+  const dialog = $('deleteDialog');
+  $('deleteDialogTitle').textContent = 'Are you sure?';
+  $('deleteDialogDescription').textContent = 'Delete ' + kind + ' “' + name + '”? ' + details;
+  $('confirmDeleteBtn').textContent = kind === 'book' ? 'Yes, delete book' : 'Yes, delete character';
+  return new Promise(resolve => {
+    const cancel = $('cancelDeleteBtn');
+    const proceed = $('confirmDeleteBtn');
+    let accepted = false;
+    const onCancel = () => dialog.close('cancel');
+    const onProceed = () => { accepted = true; dialog.close('confirm'); };
+    const onClose = () => {
+      cancel.removeEventListener('click', onCancel);
+      proceed.removeEventListener('click', onProceed);
+      dialog.removeEventListener('close', onClose);
+      resolve(accepted && dialog.returnValue === 'confirm');
+    };
+    cancel.addEventListener('click', onCancel);
+    proceed.addEventListener('click', onProceed);
+    dialog.addEventListener('close', onClose);
+    dialog.showModal();
+    // Focus the safe option. Enter cannot accidentally confirm deletion.
+    cancel.focus();
+  });
+}
+async function deleteCharacter(id) {
+  if (deleteInProgress || !state.novel || !state.charsDir) return;
+  const character = state.characters.find(c => c.id === (typeof id === 'string' ? id : state.active?.id));
+  if (!character) return;
+  const novelId = state.novel.id, writerId = state.writer?.id;
+  const approved = await confirmDeletion('character', character.name,
+    'Its character profile will be permanently removed from this novel, along with its portrait (if present).');
+  if (!approved || deleteInProgress) return;
+  // Protect pending changes to this or any other profile.
+  if (!(await flush())) { toast('Deletion cancelled because changes could not be saved.', true); return; }
+  if (state.novel?.id !== novelId || state.writer?.id !== writerId || !state.characters.includes(character)) return;
+  deleteInProgress = true;
   try {
+    status('Deleting character…', 'busy');
     await state.charsDir.removeEntry(character._filename);
+    // Only after the character file is removed should the UI forget this character.
     state.characters = state.characters.filter(c => c.id !== character.id);
-    state.active = null; state.epoch++;
-    toast('Character deleted.');
+    if (state.active?.id === character.id) {
+      state.active = null;
+      state.revision = state.savedRevision = 0;
+      state.epoch++;
+      cleanPortraitUrl();
+    }
+    let portraitFailure = null;
+    if (character.portraitFile && character.portraitFile.startsWith(character.id + '.')) {
+      try { await state.portraitsDir.removeEntry(character.portraitFile); }
+      catch (error) { if (error.name !== 'NotFoundError') portraitFailure = error; }
+    }
+    renderCharacterList();
     await showCharacters();
-  } catch (error) { toast('Deletion failed: ' + error.message, true); }
+    status(portraitFailure ? 'Character deleted; portrait cleanup incomplete' : 'Saved to folder');
+    toast(portraitFailure
+      ? 'Character deleted, but its portrait file could not be removed: ' + portraitFailure.message
+      : 'Character deleted from USB.', !!portraitFailure);
+  } catch (error) {
+    status('Delete failed', 'bad');
+    toast('Character was not deleted: ' + error.message, true);
+  } finally { deleteInProgress = false; }
+}
+async function deleteBook(id) {
+  if (deleteInProgress || !state.writerDir || !state.writer) return;
+  const novel = state.novels.find(n => n.id === id);
+  if (!novel) return;
+  const writerId = state.writer.id;
+  const approved = await confirmDeletion('book', novel.name,
+    'Its entire novel folder will be deleted, including ALL character profiles, notes, relationships, portraits, and any other files inside that folder.');
+  if (!approved || deleteInProgress) return;
+  if (!(await flush())) { toast('Deletion cancelled because changes could not be saved.', true); return; }
+  if (state.writer?.id !== writerId || !state.novels.includes(novel)) return;
+  deleteInProgress = true;
+  try {
+    status('Deleting book…', 'busy');
+    // File System Access API: remove the named book folder and all its contents.
+    // Only the selected writer's known novel folder is eligible for deletion.
+    await state.writerDir.removeEntry(novel.folder, { recursive: true });
+    state.novels = state.novels.filter(n => n.id !== novel.id);
+    if (state.novel?.id === novel.id) clearNovelState();
+    renderNovelSelect();
+    await showBookshelf();
+    status('Saved to folder');
+    toast('Book and its character files deleted from USB.');
+  } catch (error) {
+    status('Delete failed', 'bad');
+    toast('Could not delete book. Check the USB folder before trying again: ' + error.message, true);
+    // Recursive deletion may partially remove files on an interrupted USB write.
+    // We do not claim success; the user should inspect the folder first.
+  } finally { deleteInProgress = false; }
 }
 function downloadUnsavedProfile() {
   const character = state.active;
@@ -922,6 +1020,7 @@ function init() {
   $('novelCharactersBtn').onclick = () => void showCharacters();
   $('novelBackToShelfBtn').onclick = () => void showBookshelf();
   $('novelViewNewCharacterBtn').onclick = createCharacter;
+  $('novelViewDeleteBookBtn').onclick = () => { if (state.novel) void deleteBook(state.novel.id); };
   $('profileShelfBtn').onclick = () => void showBookshelf();
   $('profileNovelBtn').onclick = () => void showCharacters();
   $('novelSelect').onchange = event => {

@@ -108,7 +108,10 @@
             <h1 id="novelViewTitle">Novel</h1>
             <p id="novelViewSubtitle">Your characters</p>
           </div>
-          <button id="novelViewNewCharacterBtn" class="primary" type="button">＋ New character</button>
+          <div class="novelActions">
+            <button id="novelViewDeleteBookBtn" class="dangerOutline" type="button">Delete book</button>
+            <button id="novelViewNewCharacterBtn" class="primary" type="button">＋ New character</button>
+          </div>
         </div>
         <div class="collectionHeading"><h2>Characters</h2><span id="novelCharacterCount" class="count">0</span><div class="spacer"></div><button id="exportPdfNovelBtn" class="quiet" type="button">↓ Export PDF</button><button id="exportDocxNovelBtn" class="quiet" type="button">↓ Export Word</button></div>
         <div id="characterGallery" class="characterGallery"></div>
@@ -159,6 +162,18 @@
         <button value="ok" class="primary" type="submit">Create</button>
       </div>
     </form>
+  </dialog>
+  <dialog id="deleteDialog" class="deleteDialog" aria-labelledby="deleteDialogTitle" aria-describedby="deleteDialogDescription">
+    <div class="deleteDialogBody">
+      <div class="deleteWarningIcon" aria-hidden="true">!</div>
+      <h2 id="deleteDialogTitle">Are you sure?</h2>
+      <p id="deleteDialogDescription"></p>
+      <p class="deleteWarningText">This action is permanent. Files deleted from the flash drive may not be recoverable. Make a backup first if you might need them again.</p>
+      <div class="dialogActions">
+        <button id="cancelDeleteBtn" class="quiet" type="button">Cancel</button>
+        <button id="confirmDeleteBtn" class="dangerConfirm" type="button">Yes, delete</button>
+      </div>
+    </div>
   </dialog>
   <div id="toast" class="toast hidden" role="alert"></div>
 </body>
