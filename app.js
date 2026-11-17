@@ -1,5 +1,5 @@
 'use strict';
-/* Character Archive — USB folder storage. No accounts, tokens, or remote APIs. */
+/* Character Bookshelf — USB folder storage. No accounts, tokens, or remote APIs. */
 const $ = id => document.getElementById(id);
 const el = (tag, className = '', text) => {
   const node = document.createElement(tag);
@@ -142,11 +142,13 @@ async function askName(title, label, hint = '') {
     $('nameInput').focus();
   });
 }
-/* Pick a parent location, then open/create Character Archive inside it. An existing
-   library remains usable when the user directly selects that folder. */
+/* Pick a parent location, then open/create Character Bookshelf inside it.
+   Existing Character Archive libraries are opened in place, with their files and
+   manifest schema unchanged, so renaming the app never strands existing work. */
 async function resolveLibraryLocation(selected) {
   let root = selected;
   let existing = false;
+  // An explicitly chosen library (new or legacy) always wins.
   try {
     const file = await selected.getFileHandle('character-archive-manifest.json');
     const manifest = await readJSON(file);
@@ -155,8 +157,21 @@ async function resolveLibraryLocation(selected) {
   } catch (error) {
     if (error.name !== 'NotFoundError') throw error;
   }
-  if (selected.name.toLowerCase() !== 'character archive') {
-    root = await selected.getDirectoryHandle('Character Archive', { create: true });
+  const newName = 'Character Bookshelf';
+  const legacyName = 'Character Archive';
+  const selectionIsLibrary = [newName, legacyName].some(name =>
+    selected.name.toLowerCase() === name.toLowerCase());
+  if (!selectionIsLibrary) {
+    async function findChild(name) {
+      try { return await selected.getDirectoryHandle(name); }
+      catch (error) { if (error.name === 'NotFoundError') return null; throw error; }
+    }
+    const newFolder = await findChild(newName);
+    const legacyFolder = await findChild(legacyName);
+    if (newFolder && legacyFolder) {
+      throw new Error('Both Character Bookshelf and Character Archive folders were found. Select the one you want directly so the app does not open the wrong library.');
+    }
+    root = newFolder || legacyFolder || await selected.getDirectoryHandle(newName, { create: true });
   }
   let manifest;
   try {
@@ -167,8 +182,9 @@ async function resolveLibraryLocation(selected) {
     if (error.name !== 'NotFoundError') throw error;
     // Never silently initialize a folder that already contains files or folders.
     for await (const _entry of root.entries()) {
-      throw new Error('A Character Archive folder exists here without a valid library manifest. It was left unchanged. Choose a different location or back up and inspect that folder first.');
+      throw new Error('The selected application folder contains files but no valid library manifest. Nothing was changed. Back up and inspect this folder first.');
     }
+    // Retain the established manifest schema for compatibility with older versions.
     manifest = { type: 'character-archive', version: 1, createdAt: dateNow(), writers: [] };
     await putJSON(root, 'character-archive-manifest.json', manifest);
   }
@@ -176,7 +192,7 @@ async function resolveLibraryLocation(selected) {
 }
 function validateManifest(manifest) {
   if (!manifest || manifest.type !== 'character-archive' || !Array.isArray(manifest.writers)) {
-    throw new Error('The selected Character Archive manifest is invalid. No existing files were changed.');
+    throw new Error('The selected library manifest is invalid. No existing files were changed.');
   }
 }
 async function selectFolder() {
@@ -206,10 +222,10 @@ async function selectFolder() {
     $('folderName').textContent = root.name + (selected === root ? ' (existing library)' : ' (inside ' + selected.name + ')');
     $('retrySaveBtn').classList.add('hidden');
     $('downloadUnsavedBtn').classList.add('hidden');
-    status(existing ? 'Existing library opened' : 'Character Archive folder created');
+    status(existing ? 'Existing library opened' : 'Character Bookshelf folder created');
     renderWriterCards();
     setStage('writer');
-    toast(existing ? 'Existing Character Archive library opened.' : 'Created the Character Archive folder.');
+    toast(existing ? 'Existing library opened: ' + root.name + '.' : 'Created the Character Bookshelf folder.');
   } catch (error) {
     if (error.name === 'AbortError') return;
     $('folderError').textContent = 'Cannot open folder: ' + error.message;
@@ -668,7 +684,7 @@ async function backupLibrary() {
       if (await target.requestPermission({mode:'readwrite'}) !== 'granted') throw new Error('Write permission was not granted.');
     }
     const stamp = dateNow().replace(/[:.]/g,'-');
-    const folder = await target.getDirectoryHandle('Character-Archive-Backup-' + stamp, {create:true});
+    const folder = await target.getDirectoryHandle('Character-Bookshelf-Backup-' + stamp, {create:true});
     status('Backing up…', 'busy');
     await copyFolder(state.root, folder);
     status('Backup complete');
@@ -769,7 +785,7 @@ async function exportPdf(scope) {
         const rows = section.entries.filter(r => r.value).map(r => `<div class="field"><div class="key">${safeHtml(r.label)}</div><div class="value">${safeHtml(r.value).replace(/\r?\n/g,'<br>')}</div></div>`).join('');
         parts.push(`<section><h2>${safeHtml(section.title)}</h2>${rows || '<p class="empty">Not yet documented.</p>'}</section>`);
       }
-      pages.push(`<article class="person"><header><div><div class="kicker">CHARACTER ARCHIVE · ${safeHtml(state.novel.name)}</div><h1>${safeHtml(character.name)}</h1><p>Character profile</p></div>${portrait?`<img src="${portrait}" alt="">`:''}</header>${parts.join('')}</article>`);
+      pages.push(`<article class="person"><header><div><div class="kicker">CHARACTER BOOKSHELF · ${safeHtml(state.novel.name)}</div><h1>${safeHtml(character.name)}</h1><p>Character profile</p></div>${portrait?`<img src="${portrait}" alt="">`:''}</header>${parts.join('')}</article>`);
     }
     const title = safeHtml(exportLabel(scope));
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>
@@ -847,8 +863,8 @@ async function exportDocx(scope) {
     const files = [];
     const imageRels = [];
     const paragraphs = scope === 'novel' ?
-      [wordParagraph(exportLabel(scope), 'Title'), wordParagraph((state.writer?.name || '') + ' · Character Archive', 'Subtitle')] :
-      [wordParagraph((state.novel?.name || '') + ' · Character Archive', 'Subtitle')];
+      [wordParagraph(exportLabel(scope), 'Title'), wordParagraph((state.writer?.name || '') + ' · Character Bookshelf', 'Subtitle')] :
+      [wordParagraph((state.novel?.name || '') + ' · Character Bookshelf', 'Subtitle')];
     let imageId = 1;
     for (let i=0; i<characters.length; i++) {
       const character = characters[i];
