@@ -256,3 +256,41 @@
 .importMatchOption{display:block;text-align:left;width:100%;border-radius:8px;padding:12px 15px;border:1px solid #42688f;background:#243f5a;color:#f4f8ff;font-weight:750}
 .importMatchOption:hover{background:#345878}
 @media(max-width:700px){.importFullDialog{width:98vw;height:94vh;max-height:94vh}.importDialogHeading{padding:13px}.importCompareColumnTitles{padding:10px 13px}.importComparisonFields,.importNewFields{padding:0 11px 14px}.importFieldPair{gap:7px}.importFieldCell input,.importFieldCell textarea{font-size:12px;padding:8px}.importFooter{padding:10px}.importFooter .dialogActions{width:100%;justify-content:flex-end}.importDialogHeading h2{font-size:18px}}
+
+/* v3.8 — record dates, recently worked on, review and safe backup */
+.brandHome{display:flex;align-items:center;gap:12px;border:0;background:transparent;color:inherit;text-align:left;padding:5px 7px;border-radius:11px;flex:none}
+.brandHome:hover{background:#1d334b}.brandHome:hover .brand-icon{background:#3b6596}
+.brandWords{display:block}.brandWords strong{display:block}.brandWords small{display:block}
+.gallerySortLabel{display:flex;align-items:center;gap:8px;margin-left:8px;font-size:12px;color:#b6c9df;font-weight:650}
+.gallerySortLabel select{font-size:12px;padding:7px 9px;max-width:165px}
+.galleryUpdated{display:block;font-size:11px;color:#9eb6d2;margin-top:7px}
+.profileMetadata{border:1px solid #354e6a;border-radius:11px;background:#13243a;padding:16px;margin-top:22px}
+.profileMetadata h3{font-size:14px;margin:0 0 13px;color:#dfecfe}
+.recordGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.recordItem{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0}
+.recordItem strong{font-size:13px;font-weight:650}.recordItem .muted{font-size:11px}
+.recordLabel{font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:#9cb9d8;font-weight:750}
+.recordItem input{width:100%}.recordItem button{font-size:12px;padding:5px 9px}
+.recentBox{padding:15px 18px 18px;border:1px solid #2d425b;border-radius:12px;background:#121e2d;margin-bottom:30px}
+.recentHeading{display:flex;align-items:center;gap:15px;flex-wrap:wrap;margin-bottom:12px}
+.recentHeading h2{font-size:17px;margin:0}.recentGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:10px}
+.recentCharacter{border:1px solid #3a5270;border-radius:9px;background:#1c2e44;text-align:left;padding:12px 14px;color:#ecf4ff;display:flex;flex-direction:column;gap:5px}
+.recentCharacter:hover{background:#294462;border-color:#7ba2cf}.recentCharacter strong{font-size:13px}.recentCharacter small{font-size:11px;color:#a9c2dd}
+.searchResultGroup{border:1px solid #334b68;border-radius:12px;padding:12px 14px;background:#101d2b;display:flex;flex-direction:column;gap:8px}
+.searchResultGroup h3{font-size:15px;color:#bfdbfc;margin:0 0 3px}
+.searchExcerpt mark{color:#101e30;background:#f5d68e;border-radius:2px;padding:0 1px}
+.searchTarget{outline:2px solid #f5c779!important;outline-offset:4px;border-radius:7px;box-shadow:0 0 0 6px #c89a3344}
+.revisionCompareDialog{width:min(96vw,1060px);max-height:92vh;overflow:auto}
+.revisionSelectors{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin:16px 0}
+.revisionSelectors label{display:flex;flex-direction:column;gap:8px;color:#d7e4f7;font-weight:700;font-size:12px}
+.revisionSelectors select{width:100%}.revisionCompareBody{display:flex;flex-direction:column;gap:10px;max-height:58vh;overflow:auto}
+.revisionDifference{border:1px solid #344d69;border-radius:10px;overflow:hidden}
+.revisionDifference>strong{display:block;padding:9px 12px;background:#25405e;font-size:12px}
+.revisionPair{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#344d69}
+.revisionPair>div{background:#132338;padding:11px;min-width:0}
+.revisionPair pre{font:12px/1.55 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;margin:6px 0 0;color:#dceafb}
+.backupDialog{width:min(95vw,660px);max-height:90vh;overflow:auto}
+.backupActions{display:flex;flex-direction:column;gap:10px;margin-top:17px}
+.backupActions button{text-align:left}.restoreNameLabel{font-size:12px;font-weight:700;display:flex;flex-direction:column;gap:8px;margin-top:18px}
+.restoreNameLabel input{width:100%}
+@media(max-width:760px){.recordGrid,.revisionSelectors,.revisionPair{grid-template-columns:1fr}.recentGrid{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}.brandHome{padding:5px 0}.brandWords strong{font-size:13px}.brandWords small{font-size:10px}.gallerySortLabel{margin-left:0}}

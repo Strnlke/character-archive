@@ -1,72 +1,45 @@
-# Character Bookshelf v3.7 — Character Import Review
+# Character Bookshelf v3.8 — Character History, Search & Writer Backups
 
-This release adds a **review-first** JSON importer to the existing Character Bookshelf v3.6 USB application. No Microsoft accounts or cloud sign-in are required.
+**Upgrade from v3.7:** This is a drop-in replacement for the GitHub Pages application, not a replacement for your USB library. No account or cloud connection is required. Existing writer and character JSON structures are preserved.
 
 ## What's new
 
-- **Import character** on a novel's **All Characters** screen and **Import updates** on individual profiles.
-- Accepts `.json` files exported from Character Bookshelf as well as compact `character-bookshelf-update` JSON files prepared from a conversation.
-- **Existing character:** Matches in the selected novel by internal character ID or exact name. Opens a side-by-side comparison, organized into the six profile sections. **Left** is an editable draft of the existing character; **right** is a read-only proposed update, with selectable text and Copy buttons. Proposed fields are shown first, and sections with no proposed changes start collapsed.
-- **No automatic merge:** Imported text NEVER replaces existing content merely because a file was opened. Copy or type only what you want into the left side. Select **Save changes to USB** to commit your reviewed draft, or **Cancel** without writing.
-- **New character:** When no match is found, opens the **New Character Editor** with all six editable sections prefilled for review. No character is created until **Save new character** is selected. Cancel discards the unsaved draft.
-- **Possible duplicate:** Similar names open a choice to compare with an existing profile or intentionally create a new one. The app blocks accidentally creating a second character with the exact same name in the same novel.
-- **Safer saving:** Before saving an update to an existing character, the app rechecks the source file for external changes; if it changed, the import is blocked so the newer USB file is not overwritten. An existing-character import also saves a revision snapshot before writing the approved change.
-- **Relationship safety:** Existing internal relationship links and portrait metadata stay untouched. Incoming relationship UUIDs from an exported file are not copied because they may point to characters in another library; relationship notes are available for manual review.
+1. **Character dates:** Profiles show **Date created** and **Last updated** below Freeform Notes, separate from the writing. The creation date can be manually edited (including for older profiles missing a timestamp); the update date advances after a successful save. Both live in the character JSON and in revision snapshots. Restoring a revision retains its creation date and records the restoration as a new update.
+2. **Gallery dates and sorting:** All Characters displays the saved last-updated date, and sorts by name, newest created, or recently updated. Missing dates are shown as *not recorded*, not guessed.
+3. **Writer-wide whole-word search:** Search covers characters, notes, book titles, related character names, and structured timeline events within **the selected writer's library only**. `Ron` matches `Ron` / `Ron's`, not `confrontation`, `chronic`, or `astronaut`. Result counts reflect **books with matches**, not all books. Search results are grouped by book.
+4. **Search result focus:** Clicking a result opens its profile or timeline event, scrolls to the matching field, and selects/highlights the matching text where possible.
+5. **Compare character revisions:** Revision History now offers **Compare**, opening a side-by-side display of changed profile fields, relationship IDs, portrait filename, Date Created, and Last Updated. Compare any two saved snapshots or the current saved version. Comparisons are read-only.
+6. **Full writer ZIP backup and restore:** The top-bar **Backup & restore** menu exports the currently selected writer as a ZIP with every file in their writer folder, including books, characters, portraits, covers, tree layouts, timelines, and revision snapshots. It can read and restore ZIPs **exported by v3.8**. Before restoration, the app validates file structure and checksums and shows the counts. **Restore always creates a separate writer profile and folder**, never overwriting any existing writer. Cancel does nothing. The older **Copy full library to another folder** backup command remains available in this menu.
+7. **Recently worked on:** The current writer's bookshelf shows up to six characters with the latest saved updated dates, across their books.
+8. **Logo as Home:** Click the top-left **Character Bookshelf** logo from any normal page to return to the current writer's bookshelf. All existing navigation is retained.
 
-## Installation
+## How to update
 
-1. Back up the entire **Character Bookshelf** folder on your flash drive to a separate location.
-2. Extract the release ZIP, and upload **all three files together** — `index.html`, `app.js`, and `styles.css` — to the GitHub Pages repository currently hosting Character Bookshelf. Replace the older copies.
-3. Commit, wait for the GitHub Pages deployment to succeed, then open the application and press **Ctrl + Shift + R**.
-4. Open your existing USB folder, writer, and book. Click **Import character** or **Import updates** and select a `.json` file.
-5. For your first test, use **a backup copy** of your library and an imported update with harmless test notes. Confirm Cancel leaves the character unchanged and Save applies only your edited fields.
+1. **Back up your current entire `Character Bookshelf` USB folder to a separate drive or computer location before upgrading.**
+2. Download and extract the v3.8 release ZIP.
+3. In your GitHub repository `character-archive`, replace these **three files together** in the repository root: `index.html`, `app.js`, `styles.css`.
+4. Commit the replacement. After GitHub Pages finishes deploying, refresh the application with **Ctrl + Shift + R** in Chrome or Edge.
+5. Select the same USB location as before. You should see the same writers, books, and characters. Your USB library does not need a migration.
+6. Start by trying timestamps, search, and writer ZIP backup in your **Test Novel / test library**, then try restore and confirm it creates a separate writer with identical contents.
 
-The selected novel is the destination for imports. Neither the imported data nor your notes are sent to GitHub; the importer runs in your browser.
+## Writer ZIP backup / restore details
 
-## Update file format
+- **Export:** Open a writer, choose **Backup & restore → Export selected writer ZIP**. Save the downloaded ZIP to your computer or another drive. The app reads all files in that writer's folder. It does not transmit them to GitHub.
+- **Restore:** Select your USB library, choose **Backup & restore → Restore writer from ZIP**, choose a v3.8-exported ZIP, inspect the preview, optionally rename the restored writer, and approve. A new writer is added. **The existing writer is not replaced.**
+- **Not a general ZIP importer:** ZIP restoration accepts only the uncompressed ZIP format generated by this release. It rejects other compression types, malformed JSON in character/book files, unsafe paths, checksum mismatches, and duplicate file paths. For larger writer folders, use the legacy folder backup option instead. Browser-side ZIP limit: 512 MiB of file content / 30,000 files.
+- **Independent backup recommended:** A ZIP on the same USB flash drive is not protection against drive failure. Store a second copy somewhere else.
+- **Restore is a deliberate copy, not a merge:** It does not merge newer characters into existing profiles. Inspect the restored writer and retain or transfer whichever data you want. Restored files preserve the metadata and revision JSON exactly.
 
-A proposed update can contain only the fields that are relevant. You can ask ChatGPT to create a compatible JSON file after discussing a character, **using only the story details you confirm**.
+## Backward compatibility / safeguards
 
-```json
-{
-  "format": "character-bookshelf-update",
-  "version": 1,
-  "character": {
-    "name": "Sample Character"
-  },
-  "sections": {
-    "background": {
-      "history": "Example background text to review."
-    },
-    "personality": {
-      "traits": "Example personality text."
-    }
-  }
-}
-```
+- Character import/comparison from v3.7 remains unchanged: proposed text is read-only, existing text is editable, and no import data is written until you approve it.
+- Character links and external image paths are not rewritten by ZIP restore because the entire writer folder is copied intact.
+- Blank or missing `createdAt` / `updatedAt` timestamps display as not recorded until set or changed. All new profile JSON files have both dates.
+- Revision history keeps its existing retention behavior (up to 12 snapshots, with routine snapshots spaced approximately 15 minutes apart; explicit restore/import snapshots are forced).
+- This release does not add character status tags, cross-writer search, or automatic AI writing/editing.
 
-The importer recognizes these section names and text fields:
+## Verification and limitations
 
-| Section | Supported fields |
-| --- | --- |
-| `basic` | `fullName`, `age`, `occupation`, `appearance`, `notes` |
-| `personality` | `traits`, `fears`, `beliefs`, `motivations`, `notes` |
-| `background` | `history`, `experiences`, `notes` |
-| `relationships` | `notes` (not imported relationship IDs) |
-| `story` | `role`, `timeline`, `events`, `notes` |
-| `freeform` | `notes` |
+Automated Chromium tests using a **simulated** File System Access API passed: creation-date editing, update-date persistence, revision comparisons, exact whole-word search and in-profile focus, novel title search, recent activity, gallery sorting, clickable logo, a valid export ZIP including snapshots, canceled restore without writes, validated restore to a separate writer without modifying the original, invalid ZIP rejection, and all earlier v3.7 import-review regression tests. Node.js JavaScript syntax check also passed.
 
-The JSON file must include a name and may include any subset of supported text fields. Missing fields are presented as **No proposed change**; they do not imply deletion. An existing complete Character Bookshelf character JSON file is also accepted. If a character name in the source does not match exactly but is close to an existing name, the app asks you to choose.
-
-A sample file named `Example_Character_Update.json` is included for testing. It is **placeholder content**, not material for any of your novels.
-
-## Notes and limitations
-
-- The comparison is a **local, staged editor**: no writing to USB until you approve Save. Closing or canceling discards draft edits.
-- The new-character import uses a focused full-screen editor with the same six sections; character links, portraits, and structured timeline events can be added using the regular profile and novel controls after creation.
-- Import source relationships are text only; linked-character identifiers do not transfer from a different library. Timeline events in `timeline.json` are also not imported by character update files.
-- The browser may ask before you leave the page if an import review is still open. Review draft contents do not survive reloading the website.
-- JSON import files are limited to 1 MB; only known text fields are used. No automatic story extraction or inference takes place in Character Bookshelf.
-- One-step Undo remains page-specific. Import updates create a revision snapshot for existing characters, but importing does not establish a multi-step Undo history.
-- Existing writer profiles, book folders, timelines, pictures, links, and exports use the established v3.6 storage format; there is no migration.
-- **Verification:** Node.js JavaScript syntax check plus automated Chromium tests with simulated USB storage passed for existing-profile import, cancel, manual editing, save, new-profile review/cancel/save, exact and similar-name duplicate checks, external-change conflict blocking, native profile import, and malformed JSON rejection. **Not yet verified on your physical USB or the deployed GitHub Pages site.**
+**Not verified against your physical USB flash drive or your deployed GitHub Pages site.** Treat the first real-use session as QA and keep an external copy of your data. Chrome/Edge on HTTPS or localhost is required for direct folder access. Browser ZIP export/restore keeps files in memory and may be unsuitable for very large image-heavy libraries.

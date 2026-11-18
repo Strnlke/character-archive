@@ -266,7 +266,7 @@ async function showRevisionHistory() {
   if(!list.length)host.append(el('p','muted','No previous versions yet. A revision is saved before the next profile edit and periodically afterward.'));
   for(const entry of list){
     const row=el('div','revisionRow');
-    row.append(el('strong','',entry.stamp.replaceAll('_',' ')));
+    row.append(el('strong','',revisionLabel(entry)));
     const preview=el('button','quiet','Preview');preview.type='button';
     preview.onclick=async()=>{try{const old=await readJSON(entry.handle);window.alert(JSON.stringify(old,null,2).slice(0,14000));}catch(e){toast('Could not read revision: '+e.message,true);}};
     const restore=el('button','quiet','Restore');restore.type='button';
@@ -284,11 +284,61 @@ async function showRevisionHistory() {
         dialog.close();renderEditor();toast('Earlier character revision restored.');
       }catch(e){toast('Restore failed: '+e.message,true);}
     };
-    row.append(preview,restore);host.append(row);
+    const compare=el('button','quiet','Compare');compare.type='button';
+    compare.onclick=()=>void showRevisionComparison(entry.name);
+    row.append(preview,compare,restore);host.append(row);
   }
   dialog.showModal();
 }
 
+async function showRevisionComparison(initialName=null) {
+  if(!state.active || !(await flush()))return;
+  const entries=await listRevisions(state.active);
+  if(!entries.length){toast('No earlier versions to compare yet.',true);return;}
+  const left=$('compareRevisionLeft'),right=$('compareRevisionRight');left.replaceChildren();right.replaceChildren();
+  const options=[{name:'current',label:'Current saved profile'},...entries.map(e=>({name:e.name,label:revisionLabel(e)}))];
+  for(const item of options){left.add(new Option(item.label,item.name));right.add(new Option(item.label,item.name));}
+  left.value=initialName||entries[0].name;right.value='current';
+  $('revisionCompareDialog').showModal();
+  await renderRevisionComparison();
+}
+function revisionLabel(entry) {
+  const match=entry.stamp.match(/^(\d{4}-\d\d-\d\d)T(\d\d)-(\d\d)-(\d\d)-(\d{3})Z/);
+  if(!match)return entry.stamp;
+  const iso=match[1]+'T'+match[2]+':'+match[3]+':'+match[4]+'.'+match[5]+'Z';
+  return formatMoment(iso);
+}
+let revisionCompareToken = 0;
+async function renderRevisionComparison() {
+  const token=++revisionCompareToken;
+  const character=state.active;
+  if(!character)return;
+  const host=$('revisionCompareBody');host.replaceChildren(el('p','muted','Reading saved revisions…'));
+  try{
+    const list=await listRevisions(character);
+    const read=async name=>name==='current'?readJSON(character._handle):readJSON((list.find(e=>e.name===name)||(() => {throw Error('Revision not found.');})()).handle);
+    const [older,newer]=await Promise.all([read($('compareRevisionLeft').value),read($('compareRevisionRight').value)]);
+    if(token!==revisionCompareToken || !$('revisionCompareDialog').open)return;
+    if(older.id!==character.id||newer.id!==character.id)throw Error('Selected revision belongs to another character.');
+    host.replaceChildren();
+    const metadata=[['Record','Date created',older.createdAt,newer.createdAt],['Record','Last updated',older.updatedAt,newer.updatedAt]];
+    for(const [section,title,fields] of IMPORT_FIELDS) for(const [key,label] of fields) metadata.push([title,label,older[section]?.[key],newer[section]?.[key]]);
+    // Relationship IDs and portrait metadata remain visible, but are never altered by a comparison.
+    metadata.push(['Relationships','Linked characters (IDs)',JSON.stringify(older.relationships?.links||[]),JSON.stringify(newer.relationships?.links||[])]);
+    metadata.push(['Basic Information','Portrait file',older.portraitFile,newer.portraitFile]);
+    let changed=0;
+    for(const [section,label,a,b] of metadata){
+      const old=String(a??''),next=String(b??'');if(old===next)continue;
+      changed++;
+      const row=el('div','revisionDifference');row.append(el('strong','',section+' · '+label));
+      const pair=el('div','revisionPair');
+      const one=el('div');one.append(el('span','muted','Left'),el('pre','',old||'(blank)'));
+      const two=el('div');two.append(el('span','muted','Right'),el('pre','',next||'(blank)'));
+      pair.append(one,two);row.append(pair);host.append(row);
+    }
+    if(!changed)host.append(el('p','muted','The selected versions have no differences in their profile fields or timestamps.'));
+  }catch(e){if(token===revisionCompareToken)host.replaceChildren(el('p','errorText','Could not compare revisions: '+e.message));}
+}
 async function flushProfile() {
   clearTimeout(state.saveTimer);
   state.saveTimer = null;
@@ -303,12 +353,20 @@ async function flushProfile() {
       const snapshot = diskProfile({ ...character, updatedAt: now });
       try {
         status('Saving to USB…', 'busy');
+        // Editing and then reverting to the saved values is not a new revision.
+        const saved=await readJSON(character._handle);
+        if(JSON.stringify(saved)===JSON.stringify(diskProfile(character))){
+          state.savedRevision=revision;
+          continue;
+        }
         await saveRevisionBeforeChange(character);
         await writeHandle(character._handle, JSON.stringify(snapshot, null, 2) + '\n');
         state.savedRevision = revision;
         character.updatedAt = now;
         if (state.active === character && epoch === state.epoch) {
           $('lastSavedLabel').textContent = 'Saved ' + new Date(now).toLocaleString();
+          const updatedValue=document.querySelector('[data-profile-updated-for="'+character.id+'"]');
+          if(updatedValue)updatedValue.textContent=formatMoment(now);
         }
       } catch (error) {
         status('Save failed — changes not saved', 'bad');
@@ -718,6 +776,33 @@ async function showBookshelf() {
   }
   setActiveSidebarNavigation('bookshelf');
   setWorkspaceView('bookshelf');
+  void renderRecentlyWorkedOn();
+}
+async function renderRecentlyWorkedOn() {
+  const host=$('recentCharacters');host.replaceChildren(el('p','muted','Checking saved characters…'));
+  const writerId=state.writer?.id, results=[];
+  if(!writerId)return;
+  try {
+    for(const novel of state.novels){
+      const bookDir=await state.writerDir.getDirectoryHandle(novel.folder);
+      let dir;try{dir=await bookDir.getDirectoryHandle('characters');}catch(e){if(e.name==='NotFoundError')continue;throw e;}
+      for await(const [name,entry] of dir.entries()){
+        if(entry.kind!=='file'||!name.toLowerCase().endsWith('.json'))continue;
+        const profile=await readJSON(entry);
+        if(profile.updatedAt && Number.isFinite(Date.parse(profile.updatedAt))) results.push({profile,novel});
+      }
+    }
+    if(state.writer?.id!==writerId || pageType()!=='bookshelf')return;
+    results.sort((a,b)=>Date.parse(b.profile.updatedAt)-Date.parse(a.profile.updatedAt));
+    host.replaceChildren();
+    if(!results.length){host.append(el('p','muted','No saved update dates yet. Character updates will appear here.'));return;}
+    for(const {profile,novel} of results.slice(0,6)){
+      const btn=el('button','recentCharacter');btn.type='button';
+      btn.append(el('strong','',profile.name),el('span','muted',novel.name),el('small','',formatMoment(profile.updatedAt)));
+      btn.onclick=async()=>{await chooseNovel(novel.id);await chooseCharacter(profile.id);};
+      host.append(btn);
+    }
+  }catch(e){if(state.writer?.id===writerId && pageType()==='bookshelf')host.replaceChildren(el('p','errorText','Recently updated characters could not load: '+e.message));}
 }
 async function showCharacters() {
   if (!(await flush())) { toast('Please save your changes before viewing all characters.', true); return; }
@@ -731,13 +816,15 @@ async function showCharacters() {
   $('removeCoverBtn').disabled=!state.novel.coverFile;
   const host = $('characterGallery');
   cleanGalleryUrls(); host.replaceChildren();
+  const sort=$('gallerySort').value;
+  const sortedCharacters=[...state.characters].sort((a,b)=>sort==='updated'? ((Date.parse(b.updatedAt)||0)-(Date.parse(a.updatedAt)||0)) || a.name.localeCompare(b.name) : sort==='newest'?((Date.parse(b.createdAt)||0)-(Date.parse(a.createdAt)||0)) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name));
   if (!state.characters.length) {
     const empty = el('div','noCharacters');
     empty.append(el('span','bigGlyph','♟'), el('h3','', 'No characters yet'), el('p','', 'Create a character to start this novel’s collection.'));
     host.append(empty);
   }
   const epoch = state.epoch;
-  for (const character of state.characters) {
+  for (const character of sortedCharacters) {
     const tile = el('div','characterTile');
     const button = el('button','characterCard'); button.type='button';
     const frame = el('span','galleryPortrait');
@@ -746,6 +833,7 @@ async function showCharacters() {
     body.append(el('span','galleryName', character.name));
     const role = character.story?.role?.trim();
     if (role) body.append(el('span','galleryRole',role));
+    body.append(el('span','galleryUpdated',character.updatedAt && Number.isFinite(Date.parse(character.updatedAt)) ? 'Updated ' + new Date(character.updatedAt).toLocaleDateString() : 'Update date not recorded'));
     button.append(frame,body);
     button.addEventListener('click',()=> void chooseCharacter(character.id));
     const remove = el('button', 'characterDeleteBtn', '×');
@@ -836,6 +924,46 @@ function makeField(label, value, update, long = false, undoInfo = null) {
   container.append(lab, input);
   return container;
 }
+function formatMoment(value) {
+  const d = value && new Date(value);
+  return d && Number.isFinite(d.getTime()) ? d.toLocaleString() : 'Not recorded';
+}
+function localDatetimeValue(value) {
+  const d = value && new Date(value);
+  if (!d || !Number.isFinite(d.getTime())) return '';
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0,16);
+}
+function renderProfileMetadata(character) {
+  const root=el('div','profileMetadata');
+  const title=el('h3','', 'Character record'); root.append(title);
+  const grid=el('div','recordGrid');
+  const created=el('div','recordItem');
+  created.append(el('span','recordLabel','Date created'),el('strong','',formatMoment(character.createdAt)));
+  const edit=el('button','textButton','Edit creation date');edit.type='button';
+  const input=el('input');input.type='datetime-local';input.value=localDatetimeValue(character.createdAt);input.className='hidden';input.setAttribute('aria-label','Set character creation date');
+  const save=el('button','quiet hidden','Save date');save.type='button';
+  const cancel=el('button','textButton hidden','Cancel');cancel.type='button';
+  edit.onclick=()=>{edit.classList.add('hidden');input.classList.remove('hidden');save.classList.remove('hidden');cancel.classList.remove('hidden');input.focus();};
+  cancel.onclick=()=>{input.value=localDatetimeValue(character.createdAt);edit.classList.remove('hidden');input.classList.add('hidden');save.classList.add('hidden');cancel.classList.add('hidden');};
+  save.onclick=()=>{
+    if(!input.value || !Number.isFinite(new Date(input.value).getTime())){toast('Select a valid creation date and time.',true);return;}
+    const next=new Date(input.value).toISOString();
+    if(next!==character.createdAt){
+      const before=character.createdAt;
+      rememberUndo('Edit creation date',async()=>{
+        const target=state.characters.find(c=>c.id===character.id);if(!target)return false;
+        target.createdAt=before; if(target===state.active){queueSave();if(!(await flush()))return false;renderEditor();}
+        return true;
+      });
+      character.createdAt=next;queueSave();
+    }
+    renderEditor();
+  };
+  created.append(edit,input,save,cancel);
+  const updated=el('div','recordItem');const updatedValue=el('strong','',formatMoment(character.updatedAt));updatedValue.dataset.profileUpdatedFor=character.id;updated.append(el('span','recordLabel','Last updated'),updatedValue,el('span','muted','Automatically recorded after a successful character save'));
+  grid.append(created,updated);root.append(grid);return root;
+}
 function renderEditor() {
   const character = state.active;
   if (!character) return renderEmpty();
@@ -845,7 +973,7 @@ function renderEditor() {
   $('profileNavName').textContent = character.name;
   $('characterName').textContent = character.name;
   setActiveSidebarNavigation('');
-  $('lastSavedLabel').textContent = character.updatedAt ? 'Last saved ' + new Date(character.updatedAt).toLocaleString() : '';
+  $('lastSavedLabel').textContent = character.updatedAt && Number.isFinite(Date.parse(character.updatedAt)) ? 'Last saved ' + new Date(character.updatedAt).toLocaleString() : 'Last updated: not recorded';
   const host = $('sections'); host.replaceChildren();
   for (const section of sections) {
     character[section.key] ??= {};
@@ -856,7 +984,7 @@ function renderEditor() {
     if (section.fields.length) {
       const grid = el('div','fields');
       for (const [key, label, long] of section.fields) {
-        grid.append(makeField(label, character[section.key][key] || '', value => {
+        const fieldRow=makeField(label, character[section.key][key] || '', value => {
           character[section.key][key] = value;
           if (section.key === 'basic' && key === 'fullName') {
             character.name = value || 'Unnamed';
@@ -865,18 +993,22 @@ function renderEditor() {
             renderCharacterList();
           }
           queueSave();
-        }, !!long, {character,section:section.key,key}));
+        }, !!long, {character,section:section.key,key});
+        fieldRow.dataset.section=section.key;fieldRow.dataset.field=key;grid.append(fieldRow);
       }
       body.append(grid);
     }
     if (section.key === 'relationships') renderRelationships(body, character);
     if (section.key === 'story') renderCharacterTimelineEvents(body, character);
     const notes = el('div','notes');
-    notes.append(makeField(section.key === 'freeform' ? 'Notes' : 'Additional notes', character[section.key].notes || '', value => {
+    const notesField=makeField(section.key === 'freeform' ? 'Notes' : 'Additional notes', character[section.key].notes || '', value => {
       character[section.key].notes = value;
       queueSave();
-    }, true, {character,section:section.key,key:'notes'}));
-    body.append(notes); details.append(summary, body); host.append(details);
+    }, true, {character,section:section.key,key:'notes'});
+    notesField.dataset.section=section.key;notesField.dataset.field='notes';notes.append(notesField);
+    body.append(notes);
+    if (section.key === 'freeform') body.append(renderProfileMetadata(character));
+    details.append(summary, body); host.append(details);
   }
   void renderPortrait(character);
 }
@@ -1082,6 +1214,140 @@ function downloadUnsavedProfile() {
   anchor.click(); anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 15000);
   toast('Downloaded a recovery copy. The USB file has not been updated.');
+}
+/* v3.8: self-contained STORE-method ZIP for one selected writer. No network. */
+const WRITER_BACKUP_LIMIT = 512 * 1024 * 1024;
+const WRITER_BACKUP_FILE_LIMIT = 30000;
+let pendingWriterRestore = null;
+async function visitBackupFiles(dir,prefix,files,budget){
+  for await(const [name,entry] of dir.entries()){
+    if(name==='.'||name==='..'||name.includes('/')||name.includes('\\'))throw Error('Unsafe file name in library.');
+    const path=prefix+name;
+    if(entry.kind==='directory')await visitBackupFiles(entry,path+'/',files,budget);
+    else if(entry.kind==='file'){
+      const file=await entry.getFile();
+      budget.size+=file.size;budget.count++;
+      if(budget.size>WRITER_BACKUP_LIMIT||budget.count>WRITER_BACKUP_FILE_LIMIT)throw Error('Backup exceeds browser-safe size or file count. Use Copy full library to another folder instead.');
+      files.push([path,new Uint8Array(await file.arrayBuffer())]);
+    }
+  }
+}
+async function exportWriterZip(){
+  const button=$('exportWriterZipBtn');button.disabled=true;
+  try{
+    if(!state.writer)throw Error('Select a writer before exporting a writer ZIP.');
+    if(!(await flush()))throw Error('Unsaved changes prevented the backup.');
+    $('backupDialogStatus').textContent='Reading all files for '+state.writer.name+'…';
+    const files=[],budget={count:0,size:0};
+    await visitBackupFiles(state.writerDir,'writer/',files,budget);
+    const marker={type:'character-bookshelf-writer-backup',version:1,writer:{name:state.writer.name,id:state.writer.id},exportedAt:dateNow(),files:budget.count};
+    files.unshift(['backup.json',JSON.stringify(marker,null,2)]);
+    const zip=zipBytes(files);
+    const blob=new Blob([zip],{type:'application/zip'});
+    downloadBlob(blob,'Character-Bookshelf-'+folderSafe(state.writer.name)+'-'+new Date().toISOString().slice(0,10)+'.zip');
+    $('backupDialogStatus').textContent='Writer ZIP downloaded: '+budget.count+' files. Keep a copy outside the USB drive.';
+    toast('Writer backup downloaded.');
+  }catch(e){$('backupDialogStatus').textContent='Not exported: '+e.message;toast('Backup failed: '+e.message,true);}
+  finally{button.disabled=false;}
+}
+function unpackWriterZip(buffer){
+  const bytes=new Uint8Array(buffer),view=new DataView(buffer),decoder=new TextDecoder('utf-8',{fatal:true});
+  const files=new Map(),paths=new Set();let offset=0,total=0,count=0;
+  if(bytes.length>WRITER_BACKUP_LIMIT+5*1024*1024)throw Error('ZIP exceeds the 512 MB restore limit.');
+  while(offset+4<=bytes.length){
+    const sig=view.getUint32(offset,true);
+    if(sig===0x02014b50||sig===0x06054b50)break;
+    if(sig!==0x04034b50)throw Error('Unexpected ZIP entry. Only app-exported writer ZIPs are supported.');
+    if(offset+30>bytes.length)throw Error('Truncated ZIP header.');
+    const flags=view.getUint16(offset+6,true),method=view.getUint16(offset+8,true);
+    if((flags&0x8)!==0||method!==0)throw Error('This ZIP uses unsupported compression. Restore a ZIP exported by Character Bookshelf.');
+    const expectedCrc=view.getUint32(offset+14,true),compressed=view.getUint32(offset+18,true),uncompressed=view.getUint32(offset+22,true);
+    const nameLen=view.getUint16(offset+26,true),extraLen=view.getUint16(offset+28,true);
+    if(compressed!==uncompressed)throw Error('Unexpected ZIP entry size.');
+    const start=offset+30+nameLen+extraLen,end=start+compressed;
+    if(start>bytes.length||end>bytes.length)throw Error('ZIP file appears truncated.');
+    const name=decoder.decode(bytes.slice(offset+30,offset+30+nameLen));
+    const segments=name.split('/');
+    if(name.startsWith('/')||name.includes('\\')||segments.some(seg=>!seg||seg==='.'||seg==='..'||seg.includes(':')||/[\x00-\x1f]/.test(seg)))throw Error('Unsafe file path inside ZIP.');
+    const folded=name.toLocaleLowerCase();if(paths.has(folded))throw Error('Duplicate ZIP entry path.');paths.add(folded);
+    const data=bytes.slice(start,end);
+    if(crc32(data)!==expectedCrc)throw Error('ZIP checksum mismatch for '+name);
+    total+=data.byteLength;count++;if(total>WRITER_BACKUP_LIMIT||count>WRITER_BACKUP_FILE_LIMIT)throw Error('ZIP exceeds restore limits.');
+    files.set(name,data);offset=end;
+  }
+  if(!files.has('backup.json'))throw Error('Not a Character Bookshelf writer backup (backup.json missing).');
+  let meta;try{meta=JSON.parse(decoder.decode(files.get('backup.json')));}catch{throw Error('Invalid backup metadata.');}
+  if(meta?.type!=='character-bookshelf-writer-backup'||meta.version!==1||!cleanName(meta.writer?.name))throw Error('Not a supported Character Bookshelf writer backup.');
+  if(meta.files!==files.size-1)throw Error('Backup manifest file count does not match ZIP contents.');
+  const content=[...files].filter(([name])=>name.startsWith('writer/'));
+  if(content.length!==files.size-1)throw Error('Unrecognized files at ZIP root.');
+  // Refuse malformed book metadata BEFORE offering to restore.
+  for(const [name,data] of content){
+    if(name.endsWith('/novel.json')){
+      let novel;try{novel=JSON.parse(decoder.decode(data));}catch{throw Error('Invalid novel.json: '+name);}
+      if(novel.type!=='character-archive-novel'||!novel.id||!novel.name)throw Error('Invalid book data in '+name);
+    }
+    if(name.includes('/characters/')&&name.endsWith('.json')){
+      let character;try{character=JSON.parse(decoder.decode(data));}catch{throw Error('Invalid character JSON: '+name);}
+      if(!character.id||typeof character.name!=='string')throw Error('Invalid character in '+name);
+    }
+  }
+  return {meta,content,books:content.filter(([n])=>n.endsWith('/novel.json')).length,characters:content.filter(([n])=>n.includes('/characters/')&&n.endsWith('.json')).length,bytes:total};
+}
+async function beginRestorePreview(event){
+  const file=event.target.files?.[0];event.target.value='';if(!file)return;
+  try{
+    if(!state.root)throw Error('Select your Character Bookshelf USB library first.');
+    if(!(await flush()))throw Error('Save current changes before restoring.');
+    if(file.size>WRITER_BACKUP_LIMIT+5*1024*1024)throw Error('This ZIP is over the restore limit.');
+    const loaded=unpackWriterZip(await file.arrayBuffer());pendingWriterRestore=loaded;
+    $('restorePreviewDetails').textContent='Backup writer: '+loaded.meta.writer.name+' · '+loaded.books+' books · '+loaded.characters+' characters · '+loaded.content.length+' total files · Exported '+formatMoment(loaded.meta.exportedAt)+'.';
+    $('restoreWriterName').value=loaded.meta.writer.name+' (Restored)';
+    $('restorePreviewStatus').textContent='No changes have been made.';
+    $('restorePreviewDialog').showModal();
+  }catch(e){pendingWriterRestore=null;toast('Cannot read backup: '+e.message,true);}
+}
+async function confirmWriterRestore(){
+  if(!pendingWriterRestore||!state.root)return;
+  const btn=$('confirmRestoreBtn');btn.disabled=true;
+  let folder=null,manifestWritten=false;
+  try{
+    if(!(await flush()))throw Error('Save current changes first.');
+    const backup=pendingWriterRestore;
+    const name=cleanName($('restoreWriterName').value);
+    if(!name||name.length>100)throw Error('Enter a writer name (100 characters maximum).');
+    const manifest=await readJSON(await state.root.getFileHandle('character-archive-manifest.json'));validateManifest(manifest);
+    if(manifest.writers.some(w=>w.name.toLocaleLowerCase()===name.toLocaleLowerCase()))throw Error('A writer with that name already exists. Choose another name.');
+    const writer={id:randomId(),name,folder:''};
+    let attempt=folderSafe(name),n=2;
+    while(true){
+      const alreadyNamed=manifest.writers.some(w=>w.folder.toLocaleLowerCase()===attempt.toLocaleLowerCase());
+      let exists=false;
+      try{await state.root.getDirectoryHandle(attempt);exists=true;}catch(e){if(e.name!=='NotFoundError')throw e;}
+      if(!alreadyNamed&&!exists)break;
+      attempt=folderSafe(name)+'-'+n++;
+    }
+    folder=attempt;writer.folder=folder;
+    $('restorePreviewStatus').textContent='Restoring files to a NEW writer folder…';
+    const rootDir=await state.root.getDirectoryHandle(folder,{create:true});
+    for(const [path,data] of backup.content){
+      const segments=path.slice('writer/'.length).split('/');const fileName=segments.pop();
+      let current=rootDir;
+      for(const segment of segments)current=await current.getDirectoryHandle(segment,{create:true});
+      await putFile(current,fileName,data);
+    }
+    // Make writer visible only after every file is successfully written.
+    const next={...manifest,writers:[...manifest.writers,writer]};
+    await putJSON(state.root,'character-archive-manifest.json',next);manifestWritten=true;
+    state.manifest=next;renderWriterCards();
+    pendingWriterRestore=null;$('restorePreviewDialog').close();
+    await chooseWriter(writer.id);
+    toast('Writer restored as a separate library. Your existing files were untouched.');
+  }catch(e){
+    if(folder&&!manifestWritten){try{await state.root.removeEntry(folder,{recursive:true});}catch{toast('Check for incomplete folder '+folder+'; cleanup did not finish.',true);}}
+    $('restorePreviewStatus').textContent='NOT restored: '+e.message;
+    toast('Restore failed: '+e.message,true);
+  }finally{btn.disabled=false;}
 }
 async function backupLibrary() {
   if (hasUnsaved() || state.saving) {
@@ -1705,7 +1971,7 @@ async function showTimeline(){
   hideMainViews();cleanGalleryUrls();$('timelineView').classList.remove('hidden');
   setWorkspaceView('timeline');renderTimeline();
 }
-/* v3.6: USB-only universal search, with no index uploaded anywhere. */
+/* v3.8: Whole-word, within-writer search. Search only the selected writer's folder. */
 async function showLibrarySearch(){
   if(!(await flush()))return;
   if(!state.writer)return;
@@ -1713,55 +1979,119 @@ async function showLibrarySearch(){
   setWorkspaceView('search');
   if($('globalSearchInput').value.trim())await runLibrarySearch();
 }
-function collectSearchableParts(profile){
-  const parts=[['Name',profile.name]];
+function matchWholeWord(value,query){
+  // Unicode letter/digit boundaries reject 'Ron' within 'chronic', but accept Ron's.
+  const source=String(value??'');if(!query||!source)return -1;
+  const hay=source.toLocaleLowerCase(),needle=query.toLocaleLowerCase();
+  let from=0;
+  while(from<hay.length){
+    const at=hay.indexOf(needle,from);if(at<0)return -1;
+    const previous=at>0?source[at-1]:'';
+    const following=source[at+needle.length]||'';
+    if((!previous||!/[\p{L}\p{N}]/u.test(previous))&&(!following||!/[\p{L}\p{N}]/u.test(following)))return at;
+    from=at+1;
+  }
+  return -1;
+}
+function collectSearchableParts(profile,lookup){
+  const parts=[{label:'Character name',value:profile.name,section:'basic',key:'fullName',priority:0}];
   for(const section of sections){
     const object=profile[section.key]||{};
     for(const [key,value] of Object.entries(object)){
       if(key==='links'&&Array.isArray(value)){
-        for(const link of value){parts.push(['Relationship notes',link.notes||'']);}
-      }else if(typeof value==='string')parts.push([section.title+' / '+key,value]);
+        for(const link of value){
+          if(lookup.has(link.id))parts.push({label:'Related character',value:lookup.get(link.id),section:'relationships',key:'links',priority:2});
+          if(link.notes)parts.push({label:'Relationship notes',value:link.notes,section:'relationships',key:'links',priority:3});
+        }
+      }else if(typeof value==='string')parts.push({label:section.title+' / '+key,value,section:section.key,key,priority:key==='fullName'?0:section.key==='story'?2:3});
     }
   }
   return parts;
 }
+function searchExcerpt(value,at,len){
+  const source=String(value||'');return source.slice(Math.max(0,at-65),Math.min(source.length,at+len+100));
+}
+function highlightSearchTarget(match,term){
+  let node=null;
+  if(match.section==='relationships')node=$('section-relationships');
+  else node=[...$('sections').querySelectorAll('.field')].find(f=>f.dataset.section===match.section&&f.dataset.field===match.key);
+  if(!node)return;
+  const section=node.closest('details');if(section)section.open=true;
+  node.classList.add('searchTarget');node.scrollIntoView({block:'center',behavior:'smooth'});
+  const input=node.querySelector('textarea,input');
+  if(input){const at=matchWholeWord(input.value,term);if(at>=0){input.focus({preventScroll:true});try{input.setSelectionRange(at,at+term.length);}catch{}}}
+  setTimeout(()=>node.classList.remove('searchTarget'),6500);
+}
 async function runLibrarySearch(){
-  const text=$('globalSearchInput').value.trim().toLowerCase();
+  const text=$('globalSearchInput').value.trim();
   const host=$('searchResults');host.replaceChildren();
-  if(!text){host.append(el('p','muted','Enter a term to search your USB library.'));return;}
-  const token=++state.searchEpoch;host.append(el('p','muted','Searching your USB character and timeline files…'));
+  if(!text){host.append(el('p','muted','Enter a word or phrase to search this writer’s library.'));return;}
+  const token=++state.searchEpoch,writerId=state.writer?.id;
+  host.append(el('p','muted','Searching character profiles, relationships, books, and timelines…'));
   const matches=[];
   try{
     for(const novel of state.novels){
-      const dir=await state.writerDir.getDirectoryHandle(novel.folder);
-      const chars=await dir.getDirectoryHandle('characters');
-      for await (const [name,handle] of chars.entries()){
+      const dir=await state.writerDir.getDirectoryHandle(novel.folder),chars=await dir.getDirectoryHandle('characters');
+      const profiles=[];
+      for await(const [name,handle] of chars.entries()){
         if(handle.kind!=='file'||!name.toLowerCase().endsWith('.json'))continue;
-        const profile=await readJSON(handle);
-        const hit=collectSearchableParts(profile).find(([label,value])=>String(value||'').toLowerCase().includes(text));
-        if(hit){matches.push({kind:'character',novel,profile,match:hit});}
+        profiles.push(await readJSON(handle));
+      }
+      const lookup=new Map(profiles.map(p=>[p.id,p.name]));
+      const titleAt=matchWholeWord(novel.name,text);
+      if(titleAt>=0)matches.push({kind:'book',novel,match:{label:'Novel title',value:novel.name,priority:0,at:titleAt}});
+      for(const profile of profiles){
+        const hits=collectSearchableParts(profile,lookup).map(part=>({...part,at:matchWholeWord(part.value,text)})).filter(part=>part.at>=0).sort((a,b)=>a.priority-b.priority);
+        if(hits.length)matches.push({kind:'character',novel,profile,match:hits[0]});
       }
       const events=await loadTimelineEvents(dir);
-      for(const event of events){const fields=[['Event',event.title],['Event notes',event.notes],['Date',event.dateText]];
-        const hit=fields.find(([,value])=>String(value).toLowerCase().includes(text));
-        if(hit)matches.push({kind:'event',novel,event,match:hit});
+      for(const event of events){
+        const fields=[['Event title',event.title,'title',1],['Event notes',event.notes,'notes',3],['Event date',event.dateText,'dateText',3]];
+        for(const [label,value,key,priority] of fields){
+          const at=matchWholeWord(value,text);
+          if(at>=0){matches.push({kind:'event',novel,event,match:{label,value,key,priority,at}});break;}
+        }
       }
     }
-    if(token!==state.searchEpoch||pageType()!=='search')return;
-    host.replaceChildren();
-    host.append(el('p','searchSummary',matches.length+' result'+(matches.length===1?'':'s')+' in '+state.novels.length+' book'+(state.novels.length===1?'':'s')));
-    if(!matches.length)host.append(el('p','muted','Nothing matched. Try another word or phrase.'));
-    for(const result of matches.slice(0,200)){
-      const button=el('button','searchHit');button.type='button';
-      button.append(el('strong','',result.kind==='event'?result.event.title:result.profile.name));
-      button.append(el('span','muted',result.novel.name+' · '+result.match[0]));
-      const value=String(result.match[1]||'');const pos=value.toLowerCase().indexOf(text);
-      button.append(el('span','searchExcerpt',value.slice(Math.max(0,pos-55),pos+text.length+105)));
-      button.onclick=async()=>{await chooseNovel(result.novel.id);if(result.kind==='character')await chooseCharacter(result.profile.id);else{await showTimeline();openTimelineEventDialog(result.event.id);}};
-      host.append(button);
+    if(token!==state.searchEpoch||pageType()!=='search'||writerId!==state.writer?.id)return;
+    matches.sort((a,b)=>a.match.priority-b.match.priority||a.novel.name.localeCompare(b.novel.name));
+    const booksMatched=new Set(matches.map(m=>m.novel.id)).size;
+    host.replaceChildren(el('p','searchSummary',matches.length+' result'+(matches.length===1?'':'s')+' across '+booksMatched+' matching book'+(booksMatched===1?'':'s')));
+    if(!matches.length)host.append(el('p','muted','No whole-word matches. Try another word or phrase.'));
+    const groups=new Map();for(const result of matches.slice(0,200)){
+      if(!groups.has(result.novel.id))groups.set(result.novel.id,[]);groups.get(result.novel.id).push(result);
+    }
+    for(const [id,results] of groups){
+      const group=el('section','searchResultGroup');group.append(el('h3','',results[0].novel.name));
+      for(const result of results){
+        const button=el('button','searchHit');button.type='button';
+        button.append(el('strong','',result.kind==='book'?result.novel.name:result.kind==='event'?result.event.title:result.profile.name));
+        button.append(el('span','muted',result.match.label));
+        const excerpt=el('span','searchExcerpt');
+        const value=String(result.match.value||''),at=result.match.at;
+        const start=Math.max(0,at-65),end=Math.min(value.length,at+text.length+100);
+        excerpt.append(document.createTextNode(value.slice(start,at)));
+        excerpt.append(el('mark','',value.slice(at,at+text.length)));
+        excerpt.append(document.createTextNode(value.slice(at+text.length,end)));
+        button.append(excerpt);
+        button.onclick=async()=>{
+          await chooseNovel(result.novel.id);
+          if(result.kind==='book')return;
+          if(result.kind==='character'){
+            await chooseCharacter(result.profile.id);
+            highlightSearchTarget(result.match,text);
+          }else{
+            await showTimeline();openTimelineEventDialog(result.event.id);
+            const fieldId={title:'eventTitleInput',notes:'eventNotesInput',dateText:'eventDateInput'}[result.match.key];
+            const field=$(fieldId);if(field){const at=matchWholeWord(field.value,text);field.classList.add('searchTarget');field.focus();if(at>=0)field.setSelectionRange(at,at+text.length);setTimeout(()=>field.classList.remove('searchTarget'),6500);}
+          }
+        };
+        group.append(button);
+      }
+      host.append(group);
     }
     if(matches.length>200)host.append(el('p','muted','Showing first 200 results. Narrow your search for more.'));
-  } catch(e){if(token!==state.searchEpoch)return;host.replaceChildren(el('p','errorText','Search could not complete: '+e.message));}
+  }catch(e){if(token!==state.searchEpoch)return;host.replaceChildren(el('p','errorText','Search could not complete: '+e.message));}
 }
 /* v3.6: Upload-only book cover. The bitmap stays on the USB in its novel. */
 function cleanCoverUrls(){for(const u of state.coverUrls||[])URL.revokeObjectURL(u);state.coverUrls=[];}
@@ -2306,7 +2636,7 @@ async function saveImportedNew() {
     // A collision is exceptional, but never overwrite a pre-existing file.
     try { await state.charsDir.getFileHandle(fileName);throw Error('The filename already exists. No files were overwritten.'); }
     catch(err){if(err.name!=='NotFoundError')throw err;}
-    draft.name=name;draft.updatedAt=dateNow();
+    draft.name=name;draft.createdAt=dateNow();draft.updatedAt=draft.createdAt;
     const handle=await putJSON(state.charsDir,fileName,draft);
     draft._handle=handle;draft._filename=fileName;
     state.characters.push(draft);state.characters.sort((a,b)=>a.name.localeCompare(b.name));
@@ -2347,6 +2677,11 @@ function init() {
   $('timelineEventForm').addEventListener('submit',e=>void saveTimelineEvent(e));
   $('cancelEventBtn').onclick=()=>$('timelineEventDialog').close();
   $('closeRevisionsBtn').onclick=()=>$('revisionHistoryDialog').close();
+  $('closeRevisionCompareBtn').onclick=()=>$('revisionCompareDialog').close();
+  $('compareRevisionLeft').onchange=()=>void renderRevisionComparison();
+  $('compareRevisionRight').onchange=()=>void renderRevisionComparison();
+  $('brandHomeBtn').onclick=()=>{if(state.writer)void showBookshelf();else if(state.root){setStage('writer');} };
+  $('gallerySort').onchange=()=>{if(state.novel)void showCharacters();};
   $('revisionHistoryBtn').onclick=()=>void showRevisionHistory();
   $('timelineAllMode').onclick=()=>{state.timelineFilter='all';renderTimeline();};
   $('timelineCharacterMode').onclick=()=>{state.timelineFilter=state.characters[0]?.id||'all';renderTimeline();};
@@ -2401,7 +2736,14 @@ function init() {
   $('deleteCharacterBtn').onclick = deleteCharacter;
   $('retrySaveBtn').onclick = () => void flush();
   $('downloadUnsavedBtn').onclick = downloadUnsavedProfile;
-  $('backupBtn').onclick = backupLibrary;
+  $('backupBtn').onclick = ()=>$('backupDialog').showModal();
+  $('closeBackupBtn').onclick=()=>$('backupDialog').close();
+  $('exportWriterZipBtn').onclick=()=>void exportWriterZip();
+  $('restoreWriterZipBtn').onclick=()=>{$('backupDialog').close();$('writerBackupFileInput').click();};
+  $('writerBackupFileInput').onchange=e=>void beginRestorePreview(e);
+  $('cancelRestoreBtn').onclick=()=>{pendingWriterRestore=null;$('restorePreviewDialog').close();};
+  $('confirmRestoreBtn').onclick=()=>void confirmWriterRestore();
+  $('copyLibraryFolderBtn').onclick=()=>void backupLibrary();
   $('editorBackCharactersBtn').onclick = () => void showCharacters();
   $('editorBackBookshelfBtn').onclick = () => void showBookshelf();
   for (const button of document.querySelectorAll('[data-jump]')) {
@@ -2417,7 +2759,7 @@ function init() {
   $('exportPdfNovelBtn').onclick = () => void exportPdf('novel');
   $('exportDocxNovelBtn').onclick = () => void exportDocx('novel');
   window.addEventListener('beforeunload', event => {
-    if (hasUnsaved() || !!state.saving || treeUnsaved() || !!state.treeSaving || !!pendingImport) { event.preventDefault(); event.returnValue = ''; }
+    if (hasUnsaved() || !!state.saving || treeUnsaved() || !!state.treeSaving || !!pendingImport || !!pendingWriterRestore) { event.preventDefault(); event.returnValue = ''; }
   });
   setStage('folder');
 }
