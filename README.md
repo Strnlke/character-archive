@@ -1,45 +1,76 @@
-# Character Bookshelf v3.8 — Character History, Search & Writer Backups
+# Character Bookshelf v3.9 — Storage Reliability & Recovery
 
-**Upgrade from v3.7:** This is a drop-in replacement for the GitHub Pages application, not a replacement for your USB library. No account or cloud connection is required. Existing writer and character JSON structures are preserved.
+**Version:** 3.9. This is a drop-in application update for the v3.8 GitHub Pages deployment. It does **not** migrate or intentionally modify your existing writer, novel, character, or revision schemas. Your character library remains on your selected USB drive/folder.
 
-## What's new
+## What is new
 
-1. **Character dates:** Profiles show **Date created** and **Last updated** below Freeform Notes, separate from the writing. The creation date can be manually edited (including for older profiles missing a timestamp); the update date advances after a successful save. Both live in the character JSON and in revision snapshots. Restoring a revision retains its creation date and records the restoration as a new update.
-2. **Gallery dates and sorting:** All Characters displays the saved last-updated date, and sorts by name, newest created, or recently updated. Missing dates are shown as *not recorded*, not guessed.
-3. **Writer-wide whole-word search:** Search covers characters, notes, book titles, related character names, and structured timeline events within **the selected writer's library only**. `Ron` matches `Ron` / `Ron's`, not `confrontation`, `chronic`, or `astronaut`. Result counts reflect **books with matches**, not all books. Search results are grouped by book.
-4. **Search result focus:** Clicking a result opens its profile or timeline event, scrolls to the matching field, and selects/highlights the matching text where possible.
-5. **Compare character revisions:** Revision History now offers **Compare**, opening a side-by-side display of changed profile fields, relationship IDs, portrait filename, Date Created, and Last Updated. Compare any two saved snapshots or the current saved version. Comparisons are read-only.
-6. **Full writer ZIP backup and restore:** The top-bar **Backup & restore** menu exports the currently selected writer as a ZIP with every file in their writer folder, including books, characters, portraits, covers, tree layouts, timelines, and revision snapshots. It can read and restore ZIPs **exported by v3.8**. Before restoration, the app validates file structure and checksums and shows the counts. **Restore always creates a separate writer profile and folder**, never overwriting any existing writer. Cancel does nothing. The older **Copy full library to another folder** backup command remains available in this menu.
-7. **Recently worked on:** The current writer's bookshelf shows up to six characters with the latest saved updated dates, across their books.
-8. **Logo as Home:** Click the top-left **Character Bookshelf** logo from any normal page to return to the current writer's bookshelf. All existing navigation is retained.
+### Writer management
 
-## How to update
+- **Create Writer** no longer suggests example names.
+- **Delete Writer** is available next to each writer on the writer-selection page. It explains that the *entire writer folder* (including all books, portraits, timelines, trees, and revision files) will be permanently removed. You must type the writer's exact name before the Delete button becomes available. There is no Undo. Export a backup first.
 
-1. **Back up your current entire `Character Bookshelf` USB folder to a separate drive or computer location before upgrading.**
-2. Download and extract the v3.8 release ZIP.
-3. In your GitHub repository `character-archive`, replace these **three files together** in the repository root: `index.html`, `app.js`, `styles.css`.
-4. Commit the replacement. After GitHub Pages finishes deploying, refresh the application with **Ctrl + Shift + R** in Chrome or Edge.
-5. Select the same USB location as before. You should see the same writers, books, and characters. Your USB library does not need a migration.
-6. Start by trying timestamps, search, and writer ZIP backup in your **Test Novel / test library**, then try restore and confirm it creates a separate writer with identical contents.
+### Safer writes and conflict checks
 
-## Writer ZIP backup / restore details
+- After a write, Character Bookshelf reads the file back and checks that every byte matches what it intended to save. A successful read-back check does **not** guarantee a flash drive cannot fail later, so keep separate backups.
+- For known files in its snapshot, the app checks whether the on-disk version changed unexpectedly before writing. If it detects a conflict it **refuses to overwrite** and keeps the attempted changes available for emergency recovery. This is a best-effort check, **not an operating-system file lock**: two simultaneous writers can still race between checking and writing.
+- The Storage Status panel in the top bar shows the last verified write, pending file writes, memory snapshot completeness, and the last storage error.
 
-- **Export:** Open a writer, choose **Backup & restore → Export selected writer ZIP**. Save the downloaded ZIP to your computer or another drive. The app reads all files in that writer's folder. It does not transmit them to GitHub.
-- **Restore:** Select your USB library, choose **Backup & restore → Restore writer from ZIP**, choose a v3.8-exported ZIP, inspect the preview, optionally rename the restored writer, and approve. A new writer is added. **The existing writer is not replaced.**
-- **Not a general ZIP importer:** ZIP restoration accepts only the uncompressed ZIP format generated by this release. It rejects other compression types, malformed JSON in character/book files, unsafe paths, checksum mismatches, and duplicate file paths. For larger writer folders, use the legacy folder backup option instead. Browser-side ZIP limit: 512 MiB of file content / 30,000 files.
-- **Independent backup recommended:** A ZIP on the same USB flash drive is not protection against drive failure. Store a second copy somewhere else.
-- **Restore is a deliberate copy, not a merge:** It does not merge newer characters into existing profiles. Inspect the restored writer and retain or transfer whichever data you want. Restored files preserve the metadata and revision JSON exactly.
+### In-app Refresh View recovers storage errors
 
-## Backward compatibility / safeguards
+- The existing **Refresh View** button retries pending profile and tree saves, attempts other retained failed file writes, and then reloads the selected view **only after these attempts succeed**.
+- If storage remains inaccessible, permission cannot be granted, or a conflict prevents safe saving, Refresh View offers **Save to another location**. Pending edits are not discarded just to refresh the UI.
+- If access has changed, Chrome or Edge may require you to grant permission again.
 
-- Character import/comparison from v3.7 remains unchanged: proposed text is read-only, existing text is editable, and no import data is written until you approve it.
-- Character links and external image paths are not rewritten by ZIP restore because the entire writer folder is copied intact.
-- Blank or missing `createdAt` / `updatedAt` timestamps display as not recorded until set or changed. All new profile JSON files have both dates.
-- Revision history keeps its existing retention behavior (up to 12 snapshots, with routine snapshots spaced approximately 15 minutes apart; explicit restore/import snapshots are forced).
-- This release does not add character status tags, cross-writer search, or automatic AI writing/editing.
+### Volatile RAM snapshot
+
+- Upon choosing a library the app attempts to read all accessible files under that **Character Bookshelf library folder** into **RAM only**, including all writers. The RAM snapshot is updated after the app successfully writes files and it is reconciled after a successful in-app Refresh View.
+- **F5, browser reload, closing the tab, browser crash, or computer restart destroys this RAM snapshot.** Do not use F5 to recover a disconnected drive. Use the app's **Refresh View** instead.
+- Snapshot safety cap: **384 MiB / 20,000 files**. If the snapshot cannot be completed (for example a file becomes inaccessible or the limit is reached), the Storage Status panel labels it **Partial**. Large libraries may use considerable browser memory.
+- The snapshot contains the last data the app successfully accessed. It cannot rescue files never read into memory, nor changes made to a different copy of the library without the app seeing them. It is **not** a permanent backup.
+
+### Save to another location and recovery report
+
+1. Keep the current page open. Click the app's **Refresh View** button.
+2. If recovery is offered, select **Save to another location** and pick **a different drive or safe folder**.
+3. The app makes a **new uniquely named** `Character Bookshelf Recovery ...` subfolder; it does **not** overwrite an existing writer or your original USB folder.
+4. If the whole library snapshot is complete, it recovers all writers and overlays pending edits. If incomplete, it tries to save **only the currently selected writer** from available memory and explicitly labels the result **PARTIAL RECOVERY**.
+5. Review the recovery result and optionally select **Download recovery report** (JSON). It records writer names, file counts, pending writes included, and any copy errors. It can report missing/inaccessible data only when the app knows it is missing; never assume an unlisted file was recovered.
+6. On a successful copy, you can select **Open recovered copy** to work in that separate location. Your original USB library is not altered by this switch.
+
+If an emergency copy is interrupted, its destination folder may be incomplete. Inspect the report and the destination before relying on it. Avoid selecting the failing original drive as the recovery destination.
+
+### Configurable backup reminders
+
+- In **Storage status**, choose Never, 1, 7, 14, or 30 days (default **7 days**).
+- Reminders apply to the currently selected writer. The app records when a writer ZIP **download was initiated**, not when the ZIP was successfully moved to an external backup drive.
+- Reminder preferences and download timestamps are stored in **that browser's localStorage**, *not* on the USB. This is separate from the volatile library snapshot. Different computers/browsers have independent reminders.
+
+## Upgrading from v3.8
+
+1. **First copy your entire current `Character Bookshelf` USB folder to a different physical location.**
+2. Extract `Character_Bookshelf_v3_9_Release.zip`.
+3. Replace **all three GitHub repository files together**: `index.html`, `app.js`, `styles.css` (from the package). Keep the JSON library on the USB where it already is.
+4. Commit and let GitHub Pages finish deploying.
+5. In Chrome/Edge, refresh the website with **Ctrl + Shift + R** to load the newly deployed code; reconnect the USB library using Select location. **F5 or Ctrl + Shift + R destroys an existing in-memory snapshot, so do not do this during a storage incident.**
+6. Begin in your **Test Novel** or copied test library. Test writer creation/deletion only with disposable data; test storage recovery with a copied library first.
+
+The package also includes `Example_Character_Update.json`, retained from v3.8.
+
+## Suggested QA checklist
+
+- Create a disposable writer: the prompt has no example names.
+- On the writer-selection page, open Delete Writer, verify the confirmation stays disabled until its exact name is typed, and cancel once before testing a real deletion of a disposable writer.
+- Edit a test character. Confirm its status reaches **Saved**, and that Storage Status reports a verified write.
+- Use the **in-app Refresh View** without unplugging anything and confirm that your character data remains intact.
+- On a **copied test library only**, simulate interrupted access, try Refresh View, save to a *different* location, and inspect the resulting files and recovery report.
+- Open the new recovered copy and check that the character files are readable. Check that the original library was not overwritten.
+- Export a writer ZIP from Backup & Restore; independently check that it has the expected books and characters.
+- Confirm your existing character import comparison and revision-history workflows still work.
 
 ## Verification and limitations
 
-Automated Chromium tests using a **simulated** File System Access API passed: creation-date editing, update-date persistence, revision comparisons, exact whole-word search and in-profile focus, novel title search, recent activity, gallery sorting, clickable logo, a valid export ZIP including snapshots, canceled restore without writes, validated restore to a separate writer without modifying the original, invalid ZIP rejection, and all earlier v3.7 import-review regression tests. Node.js JavaScript syntax check also passed.
+Automated Chromium tests in a **mock File System Access environment** passed for: a complete initial RAM snapshot; normal verified character saves; prevention of overwriting an externally edited file; Refresh View offering recovery after conflicts and disconnected storage; emergency copying all available writers; partial recovery of the selected writer; opening and editing the recovered copy; deliberately corrupted write read-back detection; permanent writer deletion with typed-name confirmation; new writer creation; existing-character import comparison; new-character import; and v3.8 ZIP export.
 
-**Not verified against your physical USB flash drive or your deployed GitHub Pages site.** Treat the first real-use session as QA and keep an external copy of your data. Chrome/Edge on HTTPS or localhost is required for direct folder access. Browser ZIP export/restore keeps files in memory and may be unsuitable for very large image-heavy libraries.
+**Not tested on your real physical USB drive or your deployed GitHub Pages site.** Browser permission prompts, OS-level removable media behavior, power failures, and race conditions can differ from the mock. Treat this release as a QA candidate until you've tested it on a disposable library. Never rely solely on RAM snapshots or recovery mode for safeguarding irreplaceable manuscripts.
+
+The app does not access files outside the Character Bookshelf directory selected by the user and does not transmit library contents to a server.

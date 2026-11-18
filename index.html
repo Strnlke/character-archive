@@ -13,6 +13,7 @@
     <button class="brand brandHome" id="brandHomeBtn" type="button" title="Return to Bookshelf" aria-label="Return to the current writer’s bookshelf"><span class="brand-icon">✦</span><span class="brandWords"><strong>Character Bookshelf</strong><small>Your writing library</small></span></button>
     <div class="topactions">
       <span id="saveStatus" class="status" role="status" aria-live="polite">No folder selected</span>
+      <button id="storageStatusBtn" class="quiet hidden" type="button" title="View connection, snapshot, and pending saves">◉ Storage status</button>
       <button id="globalSearchBtn" type="button" class="quiet hidden">⌕ Search library</button>
       <button id="refreshViewBtn" type="button" class="quiet hidden" title="Reload this view from your USB folder without starting over">↻ Refresh view</button>
       <button id="undoBtn" type="button" class="undoTopButton" disabled title="Undo the last reversible action on this page">↶ Undo</button>
@@ -229,6 +230,18 @@
       <div class="importFooter"><p id="importNewStatus" role="status">No character file has been created.</p><div class="dialogActions"><button id="importNewCancel" type="button" class="quiet">Cancel</button><button id="importNewSave" type="button" class="primary">Save new character</button></div></div>
     </div>
   </dialog>
+  <dialog id="deleteWriterDialog" class="deleteDialog" aria-labelledby="deleteWriterHeading">
+    <div class="deleteDialogBody">
+      <div class="deleteWarningIcon" aria-hidden="true">!</div>
+      <h2 id="deleteWriterHeading">Permanently delete writer?</h2>
+      <p>Delete <strong id="deleteWriterName"></strong> and every book, character, portrait, timeline, tree, and revision belonging to this writer?</p>
+      <p class="deleteWarningText">There is no Undo for this action. Back up this writer first. A failed USB deletion may leave a partially removed folder that needs inspection.</p>
+      <label class="deleteWriterLabel">Type the exact writer name to confirm
+        <input id="deleteWriterConfirmInput" type="text" autocomplete="off" spellcheck="false" aria-label="Type the exact writer name to delete">
+      </label>
+      <div class="dialogActions"><button id="cancelDeleteWriterBtn" class="quiet" type="button">Cancel</button><button id="confirmDeleteWriterBtn" class="dangerConfirm" type="button" disabled>Delete writer and all data</button></div>
+    </div>
+  </dialog>
   <dialog id="nameDialog">
     <form method="dialog" id="nameForm" class="dialogBody">
       <h2 id="nameDialogTitle">New item</h2>
@@ -276,6 +289,31 @@
     </form>
   </dialog>
   <dialog id="revisionCompareDialog" class="revisionCompareDialog" aria-labelledby="revisionCompareHeading"><div class="dialogBody"><h2 id="revisionCompareHeading">Compare character revisions</h2><p class="helper">View saved snapshots side by side. Comparing never changes USB files.</p><div class="revisionSelectors"><label>Older / left<select id="compareRevisionLeft"></select></label><label>Newer / right<select id="compareRevisionRight"></select></label></div><div id="revisionCompareBody" class="revisionCompareBody"></div><div class="dialogActions"><button id="closeRevisionCompareBtn" class="quiet" type="button">Close comparison</button></div></div></dialog>
+  <dialog id="storageStatusDialog" class="backupDialog" aria-labelledby="storageStatusHeading">
+    <div class="dialogBody">
+      <h2 id="storageStatusHeading">Storage &amp; recovery status</h2>
+      <p class="helper">This memory snapshot exists only while this browser page is open. Browser refresh (F5), closing the tab, or a crash destroys it.</p>
+      <div id="storageStatusDetails" class="storageStatusDetails"></div>
+      <div class="backupReminderRow"><label for="backupReminderDays">Remind me to export a writer ZIP</label>
+        <select id="backupReminderDays"><option value="0">Never</option><option value="1">Every day</option><option value="7">Every 7 days</option><option value="14">Every 14 days</option><option value="30">Every 30 days</option></select></div>
+      <p id="lastBackupExportLabel" class="helper"></p>
+      <p class="helper">Backup reminder preferences and last download initiation are stored in this browser only. They do not confirm that a downloaded ZIP was copied to another device.</p>
+      <div class="dialogActions"><button id="closeStorageStatusBtn" type="button" class="primary">Close</button></div>
+    </div>
+  </dialog>
+  <dialog id="recoveryDialog" class="backupDialog" aria-labelledby="recoveryHeading">
+    <div class="dialogBody"><h2 id="recoveryHeading">Storage recovery</h2>
+      <p id="recoveryReason" class="errorText"></p>
+      <p class="helper">Emergency Save copies available files from this tab's memory into a NEW recovery folder. It does not overwrite or reconnect the original library. If a full snapshot is unavailable, only the current writer's recoverable files are copied.</p>
+      <p class="helper">Do not reload the browser until the recovery is saved somewhere safe. An incomplete recovery is not a backup.</p>
+      <p id="recoverySaveStatus" role="status" class="recoverySaveStatus"></p>
+      <div class="dialogActions recoveryActions">
+        <button id="downloadRecoveryReportBtn" type="button" class="quiet hidden">↓ Download recovery report</button>
+        <button id="closeRecoveryDialogBtn" type="button" class="quiet">Keep working</button>
+        <button id="saveRecoveryElsewhereBtn" type="button" class="primary">Save to another location</button><button id="openRecoveredLibraryBtn" type="button" class="quiet hidden">Open recovered copy</button>
+      </div>
+    </div>
+  </dialog>
   <dialog id="backupDialog" class="backupDialog" aria-labelledby="backupDialogTitle"><div class="dialogBody"><h2 id="backupDialogTitle">Backup &amp; restore</h2><p class="helper">Writer ZIPs include all books, character JSON, pictures, timelines, trees, and revision files. They stay on your computer.</p><div class="backupActions"><button id="exportWriterZipBtn" class="primary" type="button">↓ Export selected writer ZIP</button><button id="restoreWriterZipBtn" class="quiet" type="button">↑ Restore writer from ZIP</button><button id="copyLibraryFolderBtn" class="quiet" type="button">▣ Copy full library to another folder (legacy backup)</button></div><p id="backupDialogStatus" class="helper" role="status"></p><div class="dialogActions"><button id="closeBackupBtn" class="quiet" type="button">Close</button></div></div></dialog>
   <input id="writerBackupFileInput" type="file" accept=".zip,application/zip" hidden>
   <dialog id="restorePreviewDialog" class="backupDialog" aria-labelledby="restorePreviewHeading"><div class="dialogBody"><h2 id="restorePreviewHeading">Review writer backup</h2><p id="restorePreviewDetails"></p><p class="helper">Restoration creates a NEW writer profile; it never overwrites your existing writer or character files. Confirm only after checking the details.</p><label class="restoreNameLabel">Name for restored writer<input id="restoreWriterName" type="text" maxlength="100" placeholder="Writer name (Restored)"></label><p id="restorePreviewStatus" class="helper" role="status"></p><div class="dialogActions"><button id="cancelRestoreBtn" class="quiet" type="button">Cancel</button><button id="confirmRestoreBtn" class="primary" type="button">Restore as separate writer</button></div></div></dialog>

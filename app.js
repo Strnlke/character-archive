@@ -31,6 +31,276 @@ const state = {
   revision: 0, savedRevision: 0, portraitUrl: null, galleryUrls: [], epoch: 0, treeMeta: null, treeRevision: 0, treeSavedRevision: 0, treeTimer: null, treeSaving: null, timelineEvents: [], timelineFilter: 'all', coverUrls: [], searchEpoch: 0
 };
 
+/* v3.9 — volatile recovery. Only file bytes are kept in RAM. A browser reload
+   or closing this tab destroys them. No contents are uploaded or put in storage.
+   Storage pointers are File System Access handles, not paths on the PC. */
+const RECOVERY_LIMIT = 384 * 1024 * 1024, RECOVERY_FILE_LIMIT = 20000;
+const memoryRecovery = {
+  files:new Map(), pending:new Map(), handles:new WeakMap(), versions:new Map(),
+  bytes:0, complete:false, scanning:false, partialReason:'Not loaded',
+  lastVerified:null, lastFailure:null, disconnected:false, active:false, refreshing:false,
+  scanId:0, writeSerial:0, lastReport:null, lastRecoveryFolder:null, lastRecoveryHandle:null
+};
+const encoder = new TextEncoder();
+function sameBytes(a,b) {
+  if(!a||!b||a.byteLength!==b.byteLength)return false;
+  for(let i=0;i<a.byteLength;i++)if(a[i]!==b[i])return false;
+  return true;
+}
+async function contentBytes(content) {
+  if(content instanceof Uint8Array)return content.slice();
+  if(content instanceof ArrayBuffer)return new Uint8Array(content.slice(0));
+  if(typeof content==='string')return encoder.encode(content);
+  return new Uint8Array(await new Blob([content]).arrayBuffer());
+}
+async function recoveryPath(handle) {
+  if(!state.root || !handle)return null;
+  if(memoryRecovery.handles.has(handle))return memoryRecovery.handles.get(handle);
+  if(typeof state.root.resolve!=='function')return null;
+  try {
+    const parts=await state.root.resolve(handle);
+    if(!parts)return null;
+    const path=parts.join('/');memoryRecovery.handles.set(handle,path);
+    return path;
+  }catch{return null;}
+}
+function recoveryStore(path,data,version=null) {
+  if(path===null || !path || !data)return;
+  const previous=memoryRecovery.files.get(path);
+  const size=memoryRecovery.bytes-(previous?.byteLength||0)+data.byteLength;
+  if(size>RECOVERY_LIMIT || (previous===undefined&&memoryRecovery.files.size>=RECOVERY_FILE_LIMIT)) {
+    memoryRecovery.complete=false;memoryRecovery.partialReason='RAM recovery capacity limit reached';return;
+  }
+  memoryRecovery.files.set(path,data.slice());memoryRecovery.bytes=size;
+  if(version!==null)memoryRecovery.versions.set(path,version);
+}
+function recoveryRemove(path,prefix=false) {
+  if(!path)return;
+  for(const [key,data] of memoryRecovery.files)if(key===path||(prefix&&key.startsWith(path+'/'))){
+    memoryRecovery.bytes-=data.byteLength;memoryRecovery.files.delete(key);
+    memoryRecovery.versions.set(key,++memoryRecovery.writeSerial);
+    memoryRecovery.pending.delete(key);
+  }
+}
+async function removeTrackedEntry(directory,name,options) {
+  const base=await recoveryPath(directory),path=base===null?null:[base,name].filter(Boolean).join('/');
+  await directory.removeEntry(name,options);
+  if(path)recoveryRemove(path,!!options?.recursive);
+}
+async function captureRecoverySnapshot() {
+  if(!state.root || memoryRecovery.scanning)return;
+  const scan=++memoryRecovery.scanId,root=state.root;
+  memoryRecovery.scanning=true;memoryRecovery.partialReason='Scanning the accessible library';
+  const scanVersion=memoryRecovery.writeSerial;
+  let count=0,finished=true,reason='';
+  const walk=async(dir,prefix='')=>{
+    for await(const [name,entry] of dir.entries()) {
+      if(scan!==memoryRecovery.scanId || root!==state.root)throw Error('Snapshot interrupted by a library change.');
+      if(!name||name==='.'||name==='..'||name.includes('/')||name.includes('\\'))throw Error('Invalid library file name.');
+      const path=prefix+name;
+      memoryRecovery.handles.set(entry,path);
+      if(entry.kind==='directory'){await walk(entry,path+'/');continue;}
+      if(entry.kind!=='file')continue;
+      const data=new Uint8Array(await (await entry.getFile()).arrayBuffer());
+      count++;
+      if(memoryRecovery.bytes+data.byteLength>RECOVERY_LIMIT || count>RECOVERY_FILE_LIMIT)
+        throw Error('Library exceeds '+Math.round(RECOVERY_LIMIT/1048576)+' MiB / '+RECOVERY_FILE_LIMIT+' file RAM limit.');
+      // Never let an older file read replace a newer verified write during scanning.
+      if((memoryRecovery.versions.get(path)||0)<=scanVersion)recoveryStore(path,data);
+    }
+  };
+  try {await walk(root);}catch(error){finished=false;reason=error.message;}
+  if(scan===memoryRecovery.scanId){
+    memoryRecovery.complete=finished;
+    memoryRecovery.partialReason=finished?'':reason;
+    memoryRecovery.scanning=false;
+    if(!finished)console.warn('Character Bookshelf recovery snapshot incomplete:',reason);
+    renderStorageStatus();
+  }
+}
+function beginVolatileRecovery() {
+  memoryRecovery.scanId++;
+  memoryRecovery.files.clear();memoryRecovery.pending.clear();memoryRecovery.versions.clear();
+  memoryRecovery.handles=new WeakMap();memoryRecovery.bytes=0;
+  memoryRecovery.complete=false;memoryRecovery.scanning=false;
+  memoryRecovery.partialReason='Loading library into RAM';
+  memoryRecovery.lastVerified=null;memoryRecovery.lastFailure=null;
+  memoryRecovery.disconnected=false;memoryRecovery.active=true;
+  void captureRecoverySnapshot();
+}
+async function rememberRead(handle,bytes) {
+  if(!memoryRecovery.active || !state.root)return;
+  const path=await recoveryPath(handle);
+  if(path!==null && (memoryRecovery.refreshing||!memoryRecovery.files.has(path)))
+    recoveryStore(path,bytes,memoryRecovery.refreshing?++memoryRecovery.writeSerial:null);
+}
+function storageFailed(error) {
+  memoryRecovery.lastFailure=String(error?.message||error);
+  memoryRecovery.disconnected=error?.name==='NotFoundError'||error?.name==='NotAllowedError'||error?.name==='NotReadableError';
+  renderStorageStatus();
+}
+function renderStorageStatus() {
+  const host=$('storageStatusDetails');if(!host)return;
+  const summary=memoryRecovery.scanning?'Building snapshot':memoryRecovery.complete?'Complete':memoryRecovery.active?'Partial':'Unavailable';
+  const items=[
+    ['Original location',memoryRecovery.disconnected?'Unavailable / needs attention':state.root?.name||'Not connected'],
+    ['Last verified write',memoryRecovery.lastVerified?formatMoment(memoryRecovery.lastVerified):'Not yet verified'],
+    ['Pending file writes',String(memoryRecovery.pending.size)],
+    ['RAM snapshot',summary+' · '+memoryRecovery.files.size+' files · '+(memoryRecovery.bytes/1048576).toFixed(1)+' MiB'],
+    ['Snapshot limits',Math.round(RECOVERY_LIMIT/1048576)+' MiB / '+RECOVERY_FILE_LIMIT+' files'],
+    ['Snapshot details',memoryRecovery.partialReason||'All accessible files captured'],
+    ['Last storage error',memoryRecovery.lastFailure||'None']
+  ];
+  host.replaceChildren();
+  for(const [label,value] of items){const row=el('div','statusDataRow');row.append(el('strong','',label),el('span','',value));host.append(row);}
+}
+function memorySnapshotForRecovery() {
+  const files=new Map([...memoryRecovery.files].map(([k,v])=>[k,v.slice()]));
+  for(const [path,item] of memoryRecovery.pending)files.set(path,item.bytes.slice());
+  // Uncommitted character/tree edits stay in their editor state, even if the USB
+  // disconnected before their file handle could be used again.
+  if(state.writer?.folder && state.novel?.folder) {
+    const prefix=state.writer.folder+'/'+state.novel.folder+'/';
+    if(state.novel&&!files.has(prefix+'novel.json'))files.set(prefix+'novel.json',encoder.encode(JSON.stringify(state.novel,null,2)+'\n'));
+    for(const character of state.characters)if(character._filename){
+      const path=prefix+'characters/'+character._filename;
+      if(!files.has(path)||character===state.active&&hasUnsaved())
+        files.set(path,encoder.encode(JSON.stringify(diskProfile(character),null,2)+'\n'));
+    }
+    if(state.treeMeta&&treeUnsaved())files.set(prefix+'character-tree.json',encoder.encode(JSON.stringify(state.treeMeta,null,2)+'\n'));
+  }
+  const manifest=structuredClone(state.manifest);
+  if(!manifest)throw Error('No library manifest is available in this tab.');
+  const writerPaths=manifest.writers.filter(w=>[...files.keys()].some(k=>k.startsWith(w.folder+'/')));
+  const full=memoryRecovery.complete; // Empty writer folders legitimately have no files to snapshot.
+  // If capture failed, do not present a copy as a full multi-writer recovery.
+  let retained=full?manifest.writers:writerPaths;
+  if(!full){
+    if(!state.writer)throw Error('Select a writer before performing a partial recovery.');
+    retained=writerPaths.filter(w=>w.id===state.writer.id);
+  }
+  manifest.writers=retained;
+  if(!retained.length)throw Error('No writer files are currently recoverable.');
+  const allowed=new Set(retained.map(w=>w.folder));
+  for(const path of [...files.keys()]){
+    if(path==='character-archive-manifest.json')continue;
+    if(![...allowed].some(folder=>path.startsWith(folder+'/')))files.delete(path);
+  }
+  files.set('character-archive-manifest.json',encoder.encode(JSON.stringify(manifest,null,2)+'\n'));
+  return {files,full,retained,originalWriters:state.manifest?.writers?.length||0,pending:memoryRecovery.pending.size,reason:memoryRecovery.partialReason};
+}
+function recoveryOffer(message='The original storage location could not be accessed.') {
+  $('recoveryReason').textContent=message+' The tab can save the information currently in memory to a different folder. Do not reload or close the page yet.';
+  $('recoverySaveStatus').textContent='No files have been copied to a new location.';
+  $('openRecoveredLibraryBtn').classList.add('hidden');
+  if(!$('recoveryDialog').open)$('recoveryDialog').showModal();
+}
+function downloadRecoveryReport() {
+  if(!memoryRecovery.lastReport)return;
+  downloadBlob(new Blob([JSON.stringify(memoryRecovery.lastReport,null,2)+'\n'],{type:'application/json'}),'Character-Bookshelf-Recovery-Report.json');
+}
+async function emergencySaveElsewhere() {
+  const button=$('saveRecoveryElsewhereBtn');button.disabled=true;
+  memoryRecovery.lastReport=null;memoryRecovery.lastRecoveryHandle=null;
+  $('downloadRecoveryReportBtn').classList.add('hidden');$('openRecoveredLibraryBtn').classList.add('hidden');
+  let targetName=null,copied=0,failed=[];
+  try {
+    if(typeof window.showDirectoryPicker!=='function')throw Error('Folder selection is unavailable in this browser.');
+    const recovery=memorySnapshotForRecovery();
+    const target=await window.showDirectoryPicker({mode:'readwrite'});
+    if(typeof target.queryPermission==='function'&&await target.queryPermission({mode:'readwrite'})!=='granted'){
+      if(await target.requestPermission({mode:'readwrite'})!=='granted')throw Error('Write access was denied.');
+    }
+    // A failed/removable USB handle can throw even on equality checks. Never
+    // require successful access to the missing drive to save to a NEW target.
+    try{
+      if(state.root && typeof state.root.isSameEntry==='function' && await state.root.isSameEntry(target))
+        throw Error('Select a different destination from the original library.');
+      if(state.root && typeof state.root.resolve==='function' && await state.root.resolve(target)!==null)
+        throw Error('The recovery location must not be inside the original library.');
+    }catch(error){
+      if(!['NotFoundError','NotReadableError','NotAllowedError'].includes(error.name))throw error;
+    }
+    const base='Character Bookshelf Recovery '+dateNow().replace(/[:.]/g,'-');
+    let name=base,idx=2;
+    while(true){try{await target.getDirectoryHandle(name);name=base+'-'+idx++;}
+      catch(error){if(error.name==='NotFoundError')break;throw error;}}
+    const output=await target.getDirectoryHandle(name,{create:true});targetName=name;
+    // Empty writer folders are part of a complete library too.
+    for(const writer of recovery.retained)await output.getDirectoryHandle(writer.folder,{create:true});
+    $('recoverySaveStatus').textContent='Copying '+recovery.files.size+' recoverable files…';
+    for(const [path,bytes] of recovery.files){
+      try{
+        const segments=path.split('/'),filename=segments.pop();let dir=output;
+        for(const segment of segments)dir=await dir.getDirectoryHandle(segment,{create:true});
+        const handle=await dir.getFileHandle(filename,{create:true});
+        await writeHandle(handle,bytes);copied++;
+      }catch(e){failed.push({path,error:e.message});break;}
+    }
+    const success=failed.length===0;
+    const report={type:'character-bookshelf-recovery-report',createdAt:dateNow(),folder:targetName,
+      completeLibrary:success&&recovery.full, writersIncluded:recovery.retained.map(w=>w.name),
+      originalWriterCount:recovery.originalWriters,filesExpected:recovery.files.size,filesWritten:copied,
+      pendingEditsIncluded:recovery.pending,reason:recovery.reason||null,errors:failed};
+    memoryRecovery.lastReport=report;
+    memoryRecovery.lastRecoveryFolder=targetName;
+    $('downloadRecoveryReportBtn').classList.remove('hidden');
+    if(!success)throw Error('Only '+copied+' files copied. See the recovery report; the destination may be incomplete.');
+    memoryRecovery.lastRecoveryHandle=output;
+    $('openRecoveredLibraryBtn').classList.remove('hidden');
+    $('recoverySaveStatus').textContent='Recovery saved in '+targetName+': '+copied+' files; '+recovery.retained.length+' writer(s). '+(recovery.full?'Full snapshot':'PARTIAL RECOVERY — other data may be missing')+'. Save the report and inspect the files before relying on them.';
+    toast('Recovery copy saved. It was not switched into the live application.');
+  }catch(error){
+    if(error.name!=='AbortError'){
+      $('recoverySaveStatus').textContent='Recovery was not completed: '+error.message;
+      toast('Emergency save: '+error.message,true);
+    }
+  }finally{button.disabled=false;renderStorageStatus();}
+}
+async function openRecoveredLibrary() {
+  const root=memoryRecovery.lastRecoveryHandle;if(!root)return;
+  const writerId=state.writer?.id;
+  try {
+    const manifest=await readJSON(await root.getFileHandle('character-archive-manifest.json'));
+    validateManifest(manifest);
+    // This is a deliberate switch, NOT a retry against the missing original.
+    clearRootState();
+    state.root=root;state.selectedLocation=root;state.manifest=manifest;
+    beginVolatileRecovery();
+    $('folderName').textContent=root.name+' (recovered copy)';
+    $('retrySaveBtn').classList.add('hidden');$('downloadUnsavedBtn').classList.add('hidden');
+    renderWriterCards();setStage('writer');
+    $('recoveryDialog').close();
+    if(writerId&&manifest.writers.some(w=>w.id===writerId))await chooseWriter(writerId);
+    toast('Recovered library opened. This is a separate copy; your original USB files were not changed.');
+  }catch(error){toast('Could not open recovery copy: '+error.message,true);}
+}
+const BACKUP_REMINDER_KEY='character-bookshelf-backup-reminder-v39';
+const reminderShown=new Set();
+let reminderFallback={};
+function reminderState(){try{return JSON.parse(localStorage.getItem(BACKUP_REMINDER_KEY)||'{}');}catch{return structuredClone(reminderFallback);}}
+function saveReminderState(next){reminderFallback=structuredClone(next);try{localStorage.setItem(BACKUP_REMINDER_KEY,JSON.stringify(next));}catch{}}
+function writerReminderKey(){return (state.manifest?.createdAt||state.root?.name||'library')+'/'+(state.writer?.id||'writer');}
+function backupReminderDays(){return reminderState()[writerReminderKey()]?.days??7;}
+function setBackupReminderDays(days){const data=reminderState();const key=writerReminderKey();data[key]={...(data[key]||{}),days};saveReminderState(data);}
+function recordBackupExport(){const data=reminderState(),key=writerReminderKey();data[key]={...(data[key]||{}),lastExportAt:dateNow()};saveReminderState(data);reminderShown.add(key);}
+function maybeShowBackupReminder(){
+  if(!state.writer)return;
+  const key=writerReminderKey(),record=reminderState()[key]||{},days=record.days??7;
+  if(!days||reminderShown.has(key))return;
+  if(!record.lastExportAt||Date.now()-new Date(record.lastExportAt).getTime()>=days*86400000){
+    reminderShown.add(key);
+    toast('Backup reminder: consider exporting '+state.writer.name+'\'s writer ZIP to another device.');
+  }
+}
+function renderReminderSettings(){
+  const select=$('backupReminderDays');if(select){select.disabled=!state.writer;select.value=String(backupReminderDays());}
+  const row=$('lastBackupExportLabel');if(row){
+    const at=reminderState()[writerReminderKey()]?.lastExportAt;
+    row.textContent=at?'Last download initiated: '+formatMoment(at):'No backup download recorded on this browser.';
+  }
+}
+
 // One reversible action PER PAGE, held in this browser tab only. This is not a
 // recovery system for permanently deleted USB files and is reset on browser reload.
 const undoByPage = new Map();
@@ -115,15 +385,33 @@ async function restoreNavigation(route) {
   else if (route.view === 'bookshelf') await showBookshelf();
   else if (route.view === 'search') await showLibrarySearch();
 }
+async function retryPendingWrites() {
+  if(!memoryRecovery.pending.size)return;
+  for(const [path,entry] of [...memoryRecovery.pending]) {
+    const parts=path.split('/');let dir=state.root;
+    for(const segment of parts.slice(0,-1))dir=await dir.getDirectoryHandle(segment);
+    const handle=await dir.getFileHandle(parts.at(-1));
+    // The version in RAM represents the last known-good original file. A
+    // conflict during retry aborts the entire refresh and offers recovery.
+    await writeHandle(handle,entry.bytes);
+  }
+}
 async function refreshCurrentView() {
   if (!state.root || undoBusy) return;
-  if (!(await flush())) { toast('Save failed. Refresh canceled so no unsaved changes are lost.',true); return; }
   const refreshBtn = $('refreshViewBtn');
   refreshBtn.disabled = true;
   const page = pageType(), writerId = state.writer?.id, novelId = state.novel?.id, characterId = state.active?.id;
   const oldScope = pageUndoKey();
   try {
+    // This is the IN-APP Refresh View button, not F5. Try saving pending edits
+    // first, then reload only after all writes have been verified.
+    if(typeof state.root.queryPermission==='function'&&await state.root.queryPermission({mode:'readwrite'})!=='granted'){
+      if(await state.root.requestPermission({mode:'readwrite'})!=='granted')throw Error('Storage permission was not granted.');
+    }
+    if(!(await flush()))throw Error('Pending profile or tree edits could not be saved.');
+    await retryPendingWrites();
     // Re-read the selected USB library rather than refreshing the entire website.
+    memoryRecovery.refreshing=true;
     const manifest = await readJSON(await state.root.getFileHandle('character-archive-manifest.json'));
     validateManifest(manifest);
     state.manifest = manifest;
@@ -151,11 +439,16 @@ async function refreshCurrentView() {
     }
     undoByPage.delete(oldScope);
     updateUndoButton();
+    memoryRecovery.lastFailure=null;memoryRecovery.disconnected=false;renderStorageStatus();
+    memoryRecovery.refreshing=false;
+    void captureRecoverySnapshot(); // reconcile other writers/files when possible
     status('Current view refreshed from USB');
     toast('Current view refreshed from USB. Undo for reloaded files was cleared.');
   } catch (error) {
+    storageFailed(error);
     toast('Could not refresh this view: ' + error.message,true);
-  } finally { refreshBtn.disabled = false; }
+    recoveryOffer('Refresh could not access or safely update the original storage: '+error.message);
+  } finally { memoryRecovery.refreshing=false;refreshBtn.disabled = false; }
 }
 function rememberFieldUndo(character,section,key,original,group,label) {
   rememberUndo(label || ('Edit '+ section + ' / ' + key), async () => {
@@ -189,7 +482,9 @@ function rememberLinksUndo(characters, oldLists, label, group = null) {
 
 async function readJSON(handle) {
   const file = await handle.getFile();
-  return JSON.parse(await file.text());
+  const bytes=new Uint8Array(await file.arrayBuffer());
+  await rememberRead(handle,bytes);
+  return JSON.parse(new TextDecoder().decode(bytes));
 }
 async function putFile(directory, filename, content) {
   const handle = await directory.getFileHandle(filename, { create: true });
@@ -197,9 +492,36 @@ async function putFile(directory, filename, content) {
   return handle;
 }
 async function writeHandle(handle, content) {
-  const writer = await handle.createWritable();
-  try { await writer.write(content); await writer.close(); }
-  catch (error) { try { await writer.abort(); } catch {} throw error; }
+  const bytes=await contentBytes(content),path=await recoveryPath(handle);
+  const tracked=path!==null&&memoryRecovery.active;
+  const baseline=tracked?memoryRecovery.files.get(path):null;
+  try {
+    // Compare with the original read to avoid overwriting changes made by another
+    // computer or an external editor. Never silently replace a conflicting file.
+    if(tracked&&baseline){
+      const actual=new Uint8Array(await (await handle.getFile()).arrayBuffer());
+      if(!sameBytes(actual,baseline)){
+        const conflict=new Error('The file changed outside Character Bookshelf: '+path+'. Use recovery to save your version elsewhere.');
+        conflict.name='StorageConflictError';throw conflict;
+      }
+    }
+    const writer=await handle.createWritable();
+    try{await writer.write(content);await writer.close();}
+    catch(error){try{await writer.abort();}catch{}throw error;}
+    // A successful close is not enough: read and compare byte-for-byte.
+    const verified=new Uint8Array(await (await handle.getFile()).arrayBuffer());
+    if(!sameBytes(verified,bytes))throw Error('Save verification failed: file contents differ after writing.');
+    if(tracked){
+      recoveryStore(path,verified,++memoryRecovery.writeSerial);
+      memoryRecovery.pending.delete(path);
+    }
+    memoryRecovery.lastVerified=dateNow();memoryRecovery.lastFailure=null;
+    memoryRecovery.disconnected=false;renderStorageStatus();
+  }catch(error){
+    if(tracked)memoryRecovery.pending.set(path,{bytes:bytes.slice(),reason:error.message});
+    storageFailed(error);
+    throw error;
+  }
 }
 async function putJSON(directory, filename, data) {
   return putFile(directory, filename, JSON.stringify(data, null, 2) + '\n');
@@ -255,7 +577,7 @@ async function saveRevisionBeforeChange(character, force=false) {
   await putJSON(dir,safeStamp+'.json',disk);
   const all=await listRevisions(character);
   for(const old of all.slice(12)) {
-    try{await dir.removeEntry(old.name);}catch(e){console.warn('Could not prune old revision',e);}
+    try{await removeTrackedEntry(dir,old.name);}catch(e){console.warn('Could not prune old revision',e);}
   }
 }
 async function showRevisionHistory() {
@@ -369,6 +691,9 @@ async function flushProfile() {
           if(updatedValue)updatedValue.textContent=formatMoment(now);
         }
       } catch (error) {
+        const path=await recoveryPath(character._handle);
+        if(path!==null)memoryRecovery.pending.set(path,{bytes:encoder.encode(JSON.stringify(snapshot,null,2)+'\n'),reason:error.message});
+        storageFailed(error);
         status('Save failed — changes not saved', 'bad');
         $('retrySaveBtn').classList.remove('hidden');
         $('downloadUnsavedBtn').classList.remove('hidden');
@@ -395,6 +720,7 @@ function setStage(stage) {
   $('writerStep').classList.toggle('hidden', stage !== 'writer');
   $('workspace').classList.toggle('hidden', stage !== 'workspace');
   $('backupBtn').classList.toggle('hidden', !state.root);
+  $('storageStatusBtn').classList.toggle('hidden', !state.root);
   $('topSwitchWriterBtn').classList.toggle('hidden', stage !== 'workspace');
   $('changeFolderBtn').classList.toggle('hidden', !state.root);
   $('refreshViewBtn').classList.toggle('hidden', stage !== 'workspace');
@@ -412,6 +738,7 @@ function clearNovelState() {
 }
 
 function clearRootState() {
+  memoryRecovery.scanId++; memoryRecovery.active=false;
   clearUndo();
   state.root = null; state.selectedLocation = null; state.manifest = null; state.writer = null; state.writerDir = null;
   state.novels = []; clearNovelState();
@@ -522,6 +849,7 @@ async function selectFolder() {
     state.root = root;
     state.selectedLocation = selected;
     state.manifest = manifest;
+    beginVolatileRecovery();
     $('folderName').textContent = root.name + (selected === root ? ' (existing library)' : ' (inside ' + selected.name + ')');
     $('retrySaveBtn').classList.add('hidden');
     $('downloadUnsavedBtn').classList.add('hidden');
@@ -544,11 +872,15 @@ function renderWriterCards() {
     const button = el('button', 'writerCard'); button.type = 'button';
     button.append(el('span', 'writerAvatar', writer.name.slice(0,1).toUpperCase()), el('span', '', writer.name));
     button.addEventListener('click', () => void chooseWriter(writer.id));
-    host.append(button);
+    const tile=el('div','writerTile');
+    const del=el('button','writerDelete','Delete');del.type='button';del.title='Delete '+writer.name+' and all of their books';
+    del.setAttribute('aria-label','Delete writer '+writer.name);
+    del.onclick=()=>void deleteWriter(writer.id);
+    tile.append(button,del);host.append(tile);
   }
 }
 async function createWriter() {
-  const name = await askName('Create writer profile', 'Writer name', 'For example, Aaron or Lindsay.');
+  const name = await askName('Create writer profile', 'Writer name');
   if (!name) return;
   if (state.manifest.writers.some(w => w.name.toLowerCase() === name.toLowerCase())) {
     toast('That writer already exists.', true); return;
@@ -569,7 +901,7 @@ async function createWriter() {
       // Refuse to undo writer creation if anything was added to its folder.
       const folderHandle=await state.root.getDirectoryHandle(folder);
       for await (const _item of folderHandle.entries()) return false;
-      await state.root.removeEntry(folder);
+      await removeTrackedEntry(state.root,folder);
       const next={...state.manifest,writers:state.manifest.writers.filter(x=>x.id!==writer.id)};
       await putJSON(state.root,'character-archive-manifest.json',next);
       state.manifest=next;state.writer=null;state.writerDir=null;state.novels=[];clearNovelState();
@@ -577,6 +909,50 @@ async function createWriter() {
     }, null, pageUndoKey('writers'));
   } catch (error) { toast('Could not create writer: ' + error.message, true); }
 }
+async function deleteWriter(id) {
+  if(deleteInProgress || pageType()!=='writers' || !state.root || !state.manifest)return;
+  const writer=state.manifest.writers.find(w=>w.id===id);if(!writer)return;
+  const dialog=$('deleteWriterDialog'),input=$('deleteWriterConfirmInput');
+  $('deleteWriterName').textContent=writer.name;
+  input.value='';$('confirmDeleteWriterBtn').disabled=true;
+  const onInput=()=>{$('confirmDeleteWriterBtn').disabled=input.value.trim()!==writer.name;};
+  input.addEventListener('input',onInput);dialog.showModal();input.focus();
+  const approved=await new Promise(resolve=>{
+    let accepted=false;
+    const yes=()=>{accepted=true;dialog.close();};
+    const no=()=>dialog.close();
+    const closed=()=>{
+      input.removeEventListener('input',onInput);
+      $('confirmDeleteWriterBtn').removeEventListener('click',yes);
+      $('cancelDeleteWriterBtn').removeEventListener('click',no);
+      dialog.removeEventListener('close',closed);
+      resolve(accepted&&input.value.trim()===writer.name);
+    };
+    $('confirmDeleteWriterBtn').addEventListener('click',yes);
+    $('cancelDeleteWriterBtn').addEventListener('click',no);
+    dialog.addEventListener('close',closed);
+  });
+  if(!approved)return;
+  if(!(await flush())){toast('Writer deletion canceled: pending changes could not be saved.',true);return;}
+  deleteInProgress=true;
+  try {
+    const live=await readJSON(await state.root.getFileHandle('character-archive-manifest.json'));
+    validateManifest(live);
+    if(JSON.stringify(live)!==JSON.stringify(state.manifest))throw Error('The writer list changed on disk. Refresh before deleting.');
+    if(!live.writers.some(w=>w.id===writer.id&&w.folder===writer.folder))throw Error('The writer could not be matched safely.');
+    status('Deleting writer…','busy');
+    // The folder must be removed first. If deletion is interrupted, explicitly
+    // report that the writer may be partially deleted; never claim success.
+    await removeTrackedEntry(state.root,writer.folder,{recursive:true});
+    const next={...live,writers:live.writers.filter(w=>w.id!==writer.id)};
+    await putJSON(state.root,'character-archive-manifest.json',next);
+    state.manifest=next;renderWriterCards();clearUndo();
+    status('Writer removed');toast('Writer and their entire library deleted.');
+  }catch(error){storageFailed(error);memoryRecovery.complete=false;memoryRecovery.partialReason='Writer deletion may have been interrupted; inspect USB files';status('Writer deletion needs inspection','bad');
+    toast('Writer deletion did not finish safely: '+error.message+'. Check the USB folder before retrying.',true);
+  }finally{deleteInProgress=false;}
+}
+
 async function chooseWriter(id) {
   if (!(await flush())) { toast('Save your changes before switching writers.', true); return; }
   const writer = state.manifest.writers.find(w => w.id === id);
@@ -599,6 +975,7 @@ async function chooseWriter(id) {
     setStage('workspace');
     status('Library ready');
     await showBookshelf();
+    maybeShowBackupReminder();
   } catch (error) { toast('Could not open writer: ' + error.message, true); }
 }
 function renderNovelSelect() {
@@ -636,10 +1013,10 @@ async function createNovel() {
         }
         return false; // Do not delete unfamiliar files via Undo.
       }
-      await novelDir.removeEntry('novel.json');
-      await novelDir.removeEntry('characters');
-      await novelDir.removeEntry('portraits');
-      await state.writerDir.removeEntry(novel.folder);
+      await removeTrackedEntry(novelDir,'novel.json');
+      await removeTrackedEntry(novelDir,'characters');
+      await removeTrackedEntry(novelDir,'portraits');
+      await removeTrackedEntry(state.writerDir,novel.folder);
       state.novels=state.novels.filter(x=>x.id!==novel.id);clearNovelState();
       renderNovelSelect();await showBookshelf();return true;
     }, null, pageUndoKey('bookshelf'));
@@ -703,7 +1080,7 @@ async function createCharacter() {
     await chooseCharacter(character.id);
     rememberUndo('Create character',async () => {
       if (!state.characters.some(x=>x.id===character.id)) return false;
-      await state.charsDir.removeEntry(character._filename);
+      await removeTrackedEntry(state.charsDir,character._filename);
       state.characters=state.characters.filter(x=>x.id!==character.id);
       if(state.active?.id===character.id)state.active=null;
       await showCharacters();renderCharacterList();return true;
@@ -1134,7 +1511,7 @@ async function deleteCharacter(id) {
   deleteInProgress = true;
   try {
     status('Deleting character…', 'busy');
-    await state.charsDir.removeEntry(character._filename);
+    await removeTrackedEntry(state.charsDir,character._filename);
     // Only after the character file is removed should the UI forget this character.
     state.characters = state.characters.filter(c => c.id !== character.id);
     clearUndo(); // Permanent file deletion is intentionally not undoable.
@@ -1146,11 +1523,11 @@ async function deleteCharacter(id) {
       cleanPortraitUrl();
     }
     // A deleted character's private revision snapshots are also removed.
-    try {const revisions=await state.novelDir.getDirectoryHandle('revisions');await revisions.removeEntry(character.id,{recursive:true});}
+    try {const revisions=await state.novelDir.getDirectoryHandle('revisions');await removeTrackedEntry(revisions,character.id,{recursive:true});}
     catch(e){if(e.name!=='NotFoundError')console.warn('Could not clean character revisions:',e);}
     let portraitFailure = null;
     if (character.portraitFile && character.portraitFile.startsWith(character.id + '.')) {
-      try { await state.portraitsDir.removeEntry(character.portraitFile); }
+      try { await removeTrackedEntry(state.portraitsDir,character.portraitFile); }
       catch (error) { if (error.name !== 'NotFoundError') portraitFailure = error; }
     }
     if(state.timelineEvents.some(e=>e.characterIds.includes(character.id))) {
@@ -1186,7 +1563,7 @@ async function deleteBook(id) {
     status('Deleting book…', 'busy');
     // File System Access API: remove the named book folder and all its contents.
     // Only the selected writer's known novel folder is eligible for deletion.
-    await state.writerDir.removeEntry(novel.folder, { recursive: true });
+    await removeTrackedEntry(state.writerDir,novel.folder,{recursive:true});
     state.novels = state.novels.filter(n => n.id !== novel.id);
     if (state.novel?.id === novel.id) clearNovelState();
     renderNovelSelect();
@@ -1246,7 +1623,8 @@ async function exportWriterZip(){
     const blob=new Blob([zip],{type:'application/zip'});
     downloadBlob(blob,'Character-Bookshelf-'+folderSafe(state.writer.name)+'-'+new Date().toISOString().slice(0,10)+'.zip');
     $('backupDialogStatus').textContent='Writer ZIP downloaded: '+budget.count+' files. Keep a copy outside the USB drive.';
-    toast('Writer backup downloaded.');
+    recordBackupExport();renderReminderSettings();
+    toast('Writer backup download started. Keep a copy outside the USB drive.');
   }catch(e){$('backupDialogStatus').textContent='Not exported: '+e.message;toast('Backup failed: '+e.message,true);}
   finally{button.disabled=false;}
 }
@@ -1344,7 +1722,7 @@ async function confirmWriterRestore(){
     await chooseWriter(writer.id);
     toast('Writer restored as a separate library. Your existing files were untouched.');
   }catch(e){
-    if(folder&&!manifestWritten){try{await state.root.removeEntry(folder,{recursive:true});}catch{toast('Check for incomplete folder '+folder+'; cleanup did not finish.',true);}}
+    if(folder&&!manifestWritten){try{await removeTrackedEntry(state.root,folder,{recursive:true});}catch{toast('Check for incomplete folder '+folder+'; cleanup did not finish.',true);}}
     $('restorePreviewStatus').textContent='NOT restored: '+e.message;
     toast('Restore failed: '+e.message,true);
   }finally{btn.disabled=false;}
@@ -1440,6 +1818,9 @@ async function flushTree() {
         await putJSON(dir,'character-tree.json',{...meta,updatedAt:dateNow()});
         state.treeSavedRevision = revision;
       } catch (error) {
+        const base=await recoveryPath(dir);
+        if(base!==null)memoryRecovery.pending.set([base,'character-tree.json'].filter(Boolean).join('/'),{bytes:encoder.encode(JSON.stringify(meta,null,2)+'\n'),reason:error.message});
+        storageFailed(error);
         $('treeSaveLabel').textContent = 'Layout save failed — retry before leaving';
         $('treeSaveLabel').dataset.kind = 'bad';
         status('Tree save failed', 'bad');
@@ -2116,7 +2497,7 @@ async function uploadBookCover(evt){
     const updated={...novel,coverFile:next};delete updated.folder;
     await putJSON(state.novelDir,'novel.json',updated);
     novel.coverFile=next;
-    if(old && old!==next){try{await state.novelDir.removeEntry(old);}catch(e){toast('New cover saved, but old cover cleanup failed.',true);}}
+    if(old && old!==next){try{await removeTrackedEntry(state.novelDir,old);}catch(e){toast('New cover saved, but old cover cleanup failed.',true);}}
     $('removeCoverBtn').disabled=false;toast('Book cover saved to USB.');
   }catch(e){toast('Cover upload failed: '+e.message,true);}
 }
@@ -2126,7 +2507,7 @@ async function removeBookCover(){
   const novel=state.novel,previous=novel.coverFile;
   const clean={...novel,coverFile:null};delete clean.folder;
   try{await putJSON(state.novelDir,'novel.json',clean);novel.coverFile=null;
-    try{await state.novelDir.removeEntry(previous);}catch(e){toast('Cover hidden, but the old image could not be deleted: '+e.message,true);}
+    try{await removeTrackedEntry(state.novelDir,previous);}catch(e){toast('Cover hidden, but the old image could not be deleted: '+e.message,true);}
     $('removeCoverBtn').disabled=true;toast('Restored default book cover.');
   }catch(e){toast('Could not remove cover: '+e.message,true);}
 }
@@ -2701,6 +3082,13 @@ function init() {
   $('reselectFolderBtn').onclick = selectFolder;
   $('changeFolderBtn').onclick = selectFolder;
   $('newWriterBtn').onclick = createWriter;
+  $('storageStatusBtn').onclick=()=>{renderStorageStatus();renderReminderSettings();$('storageStatusDialog').showModal();};
+  $('closeStorageStatusBtn').onclick=()=>$('storageStatusDialog').close();
+  $('backupReminderDays').onchange=event=>{setBackupReminderDays(Number(event.target.value));renderReminderSettings();};
+  $('saveRecoveryElsewhereBtn').onclick=()=>void emergencySaveElsewhere();
+  $('closeRecoveryDialogBtn').onclick=()=>$('recoveryDialog').close();
+  $('downloadRecoveryReportBtn').onclick=downloadRecoveryReport;
+  $('openRecoveredLibraryBtn').onclick=()=>void openRecoveredLibrary();
   const switchWriter = async () => {
     if (!(await flush())) return;
     state.writer = null; state.writerDir = null; state.novels = []; clearNovelState();
@@ -2734,7 +3122,7 @@ function init() {
   $('portraitInput').onchange = event => void uploadPortrait(event);
   $('removePortraitBtn').onclick = removePortrait;
   $('deleteCharacterBtn').onclick = deleteCharacter;
-  $('retrySaveBtn').onclick = () => void flush();
+  $('retrySaveBtn').onclick = () => void refreshCurrentView();
   $('downloadUnsavedBtn').onclick = downloadUnsavedProfile;
   $('backupBtn').onclick = ()=>$('backupDialog').showModal();
   $('closeBackupBtn').onclick=()=>$('backupDialog').close();
@@ -2759,7 +3147,7 @@ function init() {
   $('exportPdfNovelBtn').onclick = () => void exportPdf('novel');
   $('exportDocxNovelBtn').onclick = () => void exportDocx('novel');
   window.addEventListener('beforeunload', event => {
-    if (hasUnsaved() || !!state.saving || treeUnsaved() || !!state.treeSaving || !!pendingImport || !!pendingWriterRestore) { event.preventDefault(); event.returnValue = ''; }
+    if (memoryRecovery.pending.size || memoryRecovery.lastFailure || hasUnsaved() || !!state.saving || treeUnsaved() || !!state.treeSaving || !!pendingImport || !!pendingWriterRestore) { event.preventDefault(); event.returnValue = ''; }
   });
   setStage('folder');
 }
