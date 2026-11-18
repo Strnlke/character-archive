@@ -2053,7 +2053,290 @@ async function exportDocx(scope) {
   } catch (error) { toast('Word export failed: ' + error.message,true); }
 }
 
+/* v3.7 — USB character update import. These modal editors stage changes in
+   memory and never touch an existing file until the user explicitly saves. */
+let pendingImport = null;
+const IMPORT_MAX_BYTES = 1024 * 1024;
+const IMPORT_FIELDS = [
+  ['basic','Basic Information', [['fullName','Full name'],['age','Age / ages'],['occupation','Occupation'],['appearance','Physical appearance'],['notes','Additional notes']]],
+  ['personality','Personality', [['traits','Personality traits'],['fears','Fears'],['beliefs','Beliefs'],['motivations','Motivations'],['notes','Additional notes']]],
+  ['background','Background', [['history','Personal history'],['experiences','Significant experiences'],['notes','Additional notes']]],
+  ['relationships','Relationships', [['notes','Relationship notes']]],
+  ['story','Story Information', [['role','Role in story'],['timeline','Timeline'],['events','Important events'],['notes','Additional notes']]],
+  ['freeform','Freeform Notes', [['notes','Notes']]]
+];
+const importFieldsArePlainObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
+function importScalar(value, field) {
+  if (typeof value === 'string') return value.slice(0, 100000);
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (value === null || value === undefined) return '';
+  throw new Error('The imported field “' + field + '” must contain text, not an array or object.');
+}
+function normalizeCharacterImport(raw) {
+  if (!importFieldsArePlainObject(raw)) throw new Error('The JSON must contain a character update object.');
+  if (raw.format && raw.format !== 'character-bookshelf-update') {
+    throw new Error('This file uses an unknown import format.');
+  }
+  if (raw.format && raw.version !== 1) throw new Error('Unsupported character update version.');
+  const entity = importFieldsArePlainObject(raw.character) ? raw.character :
+    importFieldsArePlainObject(raw.profile) ? raw.profile : raw;
+  const info = importFieldsArePlainObject(raw.sections) ? raw.sections :
+    importFieldsArePlainObject(entity.sections) ? entity.sections : entity;
+  const name = cleanName(entity.name || info.basic?.fullName || raw.name).slice(0,100);
+  if (!name) throw new Error('The imported character needs a name.');
+  const incomingId = typeof entity.id === 'string' && entity.id.length < 160 ? entity.id : null;
+  const fields = {};
+  let fieldCount = 0;
+  for (const [section, , keys] of IMPORT_FIELDS) {
+    fields[section] = {};
+    const source = info[section];
+    if (source === undefined) continue;
+    if (!importFieldsArePlainObject(source)) throw new Error('The “'+section+'” section must be an object.');
+    for (const [key] of keys) {
+      if (!Object.hasOwn(source,key)) continue;
+      fields[section][key] = importScalar(source[key],section+'.'+key);
+      fieldCount++;
+    }
+  }
+  // A name is always provided. In updates, only explicitly present fields
+  // are offered to the user, so missing properties never mean “delete”.
+  if (!Object.hasOwn(fields.basic,'fullName') && !fieldCount) fields.basic.fullName = name;
+  return {name,id:incomingId,fields,sourceIsComplete:raw.schema===1,warning:raw.relationships?.links?.length || entity.relationships?.links?.length ? 'Imported character ID links are not copied. Manage linked relationships in Character Tree.' : ''};
+}
+function importLookupName(name) {return cleanName(name).toLocaleLowerCase().replace(/\s+/g,' ');}
+function importEditDistance(a,b) {
+  if (Math.abs(a.length-b.length)>2) return 3;
+  const previous=Array.from({length:b.length+1},(_,i)=>i);
+  for(let i=1;i<=a.length;i++) {
+    const row=[i];for(let j=1;j<=b.length;j++)
+      row[j]=Math.min(previous[j]+1,row[j-1]+1,previous[j-1]+(a[i-1]===b[j-1]?0:1));
+    for(let j=0;j<row.length;j++) previous[j]=row[j];
+  }
+  return previous[b.length];
+}
+function importNearMatch(left,right) {
+  const a=importLookupName(left),b=importLookupName(right);
+  if (!a || !b) return false;
+  if (a===b) return true;
+  // Flag close names for human review, not as proof of identity.
+  if (a.length>=5 && b.length>=5 && (a.includes(b) || b.includes(a) || importEditDistance(a,b)<=2)) return true;
+  const aa=a.split(' '), bb=b.split(' ');
+  return aa.length>1 && bb.length>1 && aa[0]===bb[0] && aa[aa.length-1]===bb[bb.length-1];
+}
+function clearPendingImport() { pendingImport=null; }
+function openImportPicker() {
+  if (!state.novel || !state.charsDir) {toast('Choose a novel first.',true);return;}
+  if (hasUnsaved() || !!state.saving || treeUnsaved() || !!state.treeSaving) {
+    toast('Finish saving before opening an import. Try again after Saved to folder.',true);
+    void flush();return;
+  }
+  // Keep the file picker inside the direct click gesture. Awaiting file writes
+  // first can lose browser user activation and silently block the chooser.
+  $('characterImportFile').value='';
+  $('characterImportFile').click();
+}
+async function importCharacterFile(event) {
+  const file = event.target.files?.[0];event.target.value='';
+  if (!file) return;
+  if (!state.novel) {toast('Select a novel first.',true);return;}
+  if (file.size>IMPORT_MAX_BYTES) {toast('Import file must be under 1 MB.',true);return;}
+  if (!/\.json$/i.test(file.name)) {toast('Choose a .json character update file.',true);return;}
+  try {
+    if (!(await flush())) return;
+    const data=JSON.parse(await file.text());
+    const parsed=normalizeCharacterImport(data);
+    pendingImport={parsed,novelId:state.novel.id,writerId:state.writer.id};
+    const matchedById=parsed.id ? state.characters.find(c=>c.id===parsed.id) : null;
+    const matchedByName=state.characters.filter(c=>importLookupName(c.name)===importLookupName(parsed.name));
+    if (matchedById && matchedByName.length && !matchedByName.includes(matchedById)) {
+      showImportMatches([matchedById,...matchedByName]);return;
+    }
+    if (matchedById || matchedByName.length===1) {
+      await openImportCompare(matchedById||matchedByName[0]);return;
+    }
+    if (matchedByName.length>1) {showImportMatches(matchedByName);return;}
+    const similar=state.characters.filter(c=>importNearMatch(c.name,parsed.name));
+    if (similar.length) showImportMatches(similar);
+    else openImportedNewEditor();
+  } catch(error) {clearPendingImport();toast('Import could not be opened: '+error.message,true);}
+}
+function showImportMatches(candidates) {
+  if (!pendingImport) return;
+  const host=$('importMatchList');host.replaceChildren();
+  $('importMatchDescription').textContent='“'+pendingImport.parsed.name+'” may already exist in '+state.novel.name+'. Choose a character to compare, or intentionally create a new one.';
+  for(const candidate of candidates) {
+    const button=el('button','importMatchOption');button.type='button';button.textContent='Compare with '+candidate.name;
+    button.onclick=()=>{$('importMatchDialog').close();void openImportCompare(candidate);};host.append(button);
+  }
+  $('importMatchDialog').showModal();
+}
+function importDraftFromCharacter(character) {
+  const result=diskProfile(character);
+  for (const [section,,keys] of IMPORT_FIELDS) {
+    result[section] ??= {};
+    for (const [key] of keys) result[section][key]=String(result[section][key] ?? '');
+  }
+  return result;
+}
+function addImportFieldGrid(host,model,proposal,editable=true) {
+  for (const [section,title,keys] of IMPORT_FIELDS) {
+    const proposalCount=editable ? keys.filter(([key])=>proposal?.[section] && Object.hasOwn(proposal[section],key)).length : 0;
+    const group=el('details','importSection');group.open=editable ? proposalCount>0 : true;
+    const summary=el('summary');summary.textContent=title+(editable ? ' · '+(proposalCount ? proposalCount+' proposed field'+(proposalCount>1?'s':'') : 'no proposed fields') : '');group.append(summary);
+    const content=el('div','importSectionBody');
+    const orderedKeys=editable ? [...keys.filter(([key])=>proposal?.[section] && Object.hasOwn(proposal[section],key)),...keys.filter(([key])=>!(proposal?.[section] && Object.hasOwn(proposal[section],key)))] : keys;
+    for (const [key,label] of orderedKeys) {
+      const row=el('div',editable?'importFieldPair':'importFieldSingle');
+      const existing=el('label','importFieldCell');
+      existing.append(el('span','importFieldName',label));
+      const input=el(key==='fullName'||key==='age'||key==='occupation'||key==='role'?'input':'textarea','importExistingInput');
+      if (input.tagName==='TEXTAREA') input.rows=3;
+      input.value=model[section]?.[key] ?? '';
+      input.addEventListener('input',()=>{
+        model[section] ??= {};model[section][key]=input.value;
+        if (section==='basic' && key==='fullName') model.name=input.value;
+      });
+      existing.append(input);row.append(existing);
+      if (editable) {
+        const proposed=el('div','importFieldCell');
+        proposed.append(el('span','importFieldName','Proposed '+label));
+        const value=proposal?.[section] && Object.hasOwn(proposal[section],key) ? proposal[section][key] : null;
+        const reader=el('textarea','importProposedInput');reader.readOnly=true;reader.rows=3;
+        if (value===null){reader.placeholder='No proposed change';reader.value='';}
+        else {reader.value=value;reader.dataset.proposed='true';}
+        const copy=el('button','quiet importCopy','Copy proposed');copy.type='button';copy.disabled=value===null;
+        copy.onclick=async()=>{
+          reader.focus();reader.select();
+          try{await navigator.clipboard.writeText(value);toast('Copied '+label+' to clipboard.');}
+          catch{toast('Select the proposed text and use Ctrl+C to copy.');}
+        };
+        proposed.append(reader,copy);row.append(proposed);
+      }
+      content.append(row);
+    }
+    group.append(content);host.append(group);
+  }
+}
+async function openImportCompare(character) {
+  if (!pendingImport || !state.characters.some(c=>c.id===character.id)) return;
+  try {
+    if (!(await flush()))return;
+    const disk=await readJSON(character._handle);
+    if (disk.id!==character.id) throw new Error('Character file ID differs from the loaded profile.');
+    const draft=importDraftFromCharacter(character);
+    pendingImport.mode='compare';pendingImport.targetId=character.id;
+    pendingImport.baseline=JSON.stringify(disk);pendingImport.draft=draft;
+    $('importCompareTitle').textContent='Compare: '+character.name;
+    const idWarning = pendingImport.parsed.id && pendingImport.parsed.id!==character.id ? ' IDs differ; matched by name. Verify the character before saving. ' :
+      pendingImport.parsed.id === character.id && importLookupName(pendingImport.parsed.name)!==importLookupName(character.name) ? ' Names differ; matched by ID. Verify the character before saving. ' : '';
+    $('importCompareHint').textContent='Left: make your edits. Right: reference or copy what you want. Nothing changes on USB until Save. '+idWarning+pendingImport.parsed.warning;
+    const host=$('importComparisonFields');host.replaceChildren();addImportFieldGrid(host,draft,pendingImport.parsed.fields,true);
+    $('importCompareStatus').textContent='Review first. Nothing has been saved.';
+    $('importCompareDialog').showModal();
+  }catch(error){toast('Cannot review imported profile: '+error.message,true);}
+}
+function openImportedNewEditor() {
+  if (!pendingImport) return;
+  pendingImport.mode='new';
+  const parsed=pendingImport.parsed,draft=blankCharacter(parsed.name);
+  for (const [section,,keys] of IMPORT_FIELDS) for(const [key] of keys) {
+    if (Object.hasOwn(parsed.fields[section]||{},key)) draft[section][key]=parsed.fields[section][key];
+  }
+  // New imports always receive a new ID; relationship UUIDs from other books
+  // cannot be trusted. Editor keeps the profile in memory until Save.
+  pendingImport.draft=draft;
+  $('importNewTitle').textContent='New Character: '+parsed.name;
+  const host=$('importNewFields');host.replaceChildren();addImportFieldGrid(host,draft,null,false);
+  $('importNewStatus').textContent='Nothing has been written to the USB yet. '+parsed.warning;
+  $('importNewDialog').showModal();
+}
+function importContextIsCurrent() {
+  return pendingImport && state.writer?.id===pendingImport.writerId && state.novel?.id===pendingImport.novelId;
+}
+async function saveImportedExisting() {
+  if (!importContextIsCurrent() || pendingImport.mode!=='compare') return;
+  const button=$('importCompareSave');button.disabled=true;
+  try {
+    if (!(await flush())) throw Error('Unsaved changes elsewhere prevented the import.');
+    const target=state.characters.find(c=>c.id===pendingImport.targetId);
+    if (!target)throw Error('Target character no longer exists.');
+    const disk=await readJSON(target._handle);
+    if(JSON.stringify(disk)!==pendingImport.baseline) {
+      throw Error('This character changed on USB since the comparison opened. Cancel and import again; nothing was overwritten.');
+    }
+    const draft=pendingImport.draft;
+    const newName=cleanName(draft.basic?.fullName || draft.name);
+    if(!newName)throw Error('Full name cannot be empty.');
+    if(state.characters.some(c=>c.id!==target.id && importLookupName(c.name)===importLookupName(newName)))throw Error('Another character already has that name.');
+    const updated=structuredClone(disk);
+    for (const [section,,keys] of IMPORT_FIELDS) {
+      updated[section] ??= {};
+      for (const [key] of keys) updated[section][key]=draft[section][key]??'';
+    }
+    // Preserve the original link UUIDs, picture, timestamps, and unknown fields.
+    updated.name=newName;
+    const changed = updated.name!==disk.name || IMPORT_FIELDS.some(([section,,keys]) =>
+      keys.some(([key]) => String(updated[section]?.[key] ?? '') !== String(disk[section]?.[key] ?? '')));
+    if (!changed) { $('importCompareDialog').close();clearPendingImport();toast('No changes needed.');return; }
+    updated.updatedAt=dateNow();
+    await saveRevisionBeforeChange(target,true);
+    await writeHandle(target._handle,JSON.stringify(updated,null,2)+'\n');
+    const handle=target._handle,filename=target._filename;
+    for (const key of Object.keys(target))if(!key.startsWith('_'))delete target[key];
+    Object.assign(target,updated,{_handle:handle,_filename:filename});
+    state.characters.sort((a,b)=>a.name.localeCompare(b.name));
+    const importUndoScope=[state.manifest?.createdAt||state.root?.name||'library',state.writer.id,state.novel.id,'editor',target.id].join('/');
+    clearUndo(importUndoScope); // No stale pre-import Undo may overwrite a reviewed change.
+    if (state.active===target){state.savedRevision=state.revision;renderEditor();}
+    else {renderCharacterList();if(!$('novelView').classList.contains('hidden'))await showCharacters();}
+    $('importCompareDialog').close();clearPendingImport();status('Saved to folder');toast('Reviewed character changes saved to USB.');
+  }catch(error){$('importCompareStatus').textContent='NOT SAVED: '+error.message;toast(error.message,true);}
+  finally{button.disabled=false;}
+}
+async function saveImportedNew() {
+  if (!importContextIsCurrent() || pendingImport.mode!=='new')return;
+  const button=$('importNewSave');button.disabled=true;
+  try {
+    if (!(await flush()))throw Error('Unsaved edits elsewhere prevented saving.');
+    const draft=pendingImport.draft;
+    const name=cleanName(draft.basic?.fullName || draft.name);
+    if(!name)throw Error('Enter a character name first.');
+    if(state.characters.some(c=>importLookupName(c.name)===importLookupName(name)))throw Error('A character with that name already exists. Cancel and compare with the existing profile instead.');
+    const fileName=folderSafe(name)+'--'+draft.id.slice(0,8)+'.json';
+    // A collision is exceptional, but never overwrite a pre-existing file.
+    try { await state.charsDir.getFileHandle(fileName);throw Error('The filename already exists. No files were overwritten.'); }
+    catch(err){if(err.name!=='NotFoundError')throw err;}
+    draft.name=name;draft.updatedAt=dateNow();
+    const handle=await putJSON(state.charsDir,fileName,draft);
+    draft._handle=handle;draft._filename=fileName;
+    state.characters.push(draft);state.characters.sort((a,b)=>a.name.localeCompare(b.name));
+    $('importNewDialog').close();clearPendingImport();await chooseCharacter(draft.id);
+    status('Saved to folder');toast('New character created from reviewed import.');
+  }catch(error){$('importNewStatus').textContent='NOT SAVED: '+error.message;toast('Could not save imported character: '+error.message,true);}
+  finally{button.disabled=false;}
+}
+function initImportTools(){
+  $('importCharacterNovelBtn').onclick=()=>void openImportPicker();
+  $('importCharacterProfileBtn').onclick=()=>void openImportPicker();
+  $('characterImportFile').addEventListener('change',e=>void importCharacterFile(e));
+  $('importMatchCancel').onclick=()=>{$('importMatchDialog').close();clearPendingImport();};
+  $('importMatchCreate').onclick=()=>{$('importMatchDialog').close();openImportedNewEditor();};
+  $('importCompareClose').onclick=$('importCompareCancel').onclick=()=>{$('importCompareDialog').close();clearPendingImport();};
+  $('importCompareCreateDifferent').onclick=()=>{$('importCompareDialog').close();openImportedNewEditor();};
+  $('importCompareSave').onclick=()=>void saveImportedExisting();
+  $('importNewClose').onclick=$('importNewCancel').onclick=()=>{$('importNewDialog').close();clearPendingImport();};
+  $('importNewSave').onclick=()=>void saveImportedNew();
+  for (const id of ['importMatchDialog','importCompareDialog','importNewDialog']) {
+    $(id).addEventListener('close',()=>{
+      // Escape closes without applying changes. Explicitly clear staged state
+      // unless a different import modal was opened by the transition.
+      if (!['importMatchDialog','importCompareDialog','importNewDialog'].some(other=>$(other).open)) clearPendingImport();
+    });
+  }
+}
+
 function init() {
+  initImportTools();
   $('undoBtn').onclick=()=>void undoLast();updateUndoButton();
   $('refreshViewBtn').onclick=()=>void refreshCurrentView();
   $('globalSearchBtn').onclick=()=>void showLibrarySearch();
@@ -2134,7 +2417,7 @@ function init() {
   $('exportPdfNovelBtn').onclick = () => void exportPdf('novel');
   $('exportDocxNovelBtn').onclick = () => void exportDocx('novel');
   window.addEventListener('beforeunload', event => {
-    if (hasUnsaved() || !!state.saving || treeUnsaved() || !!state.treeSaving) { event.preventDefault(); event.returnValue = ''; }
+    if (hasUnsaved() || !!state.saving || treeUnsaved() || !!state.treeSaving || !!pendingImport) { event.preventDefault(); event.returnValue = ''; }
   });
   setStage('folder');
 }

@@ -1,0 +1,15 @@
+{
+  "format": "character-bookshelf-update",
+  "version": 1,
+  "character": {
+    "name": "Sample Character"
+  },
+  "sections": {
+    "background": {
+      "history": "Example background text for import testing."
+    },
+    "personality": {
+      "traits": "Example character trait for review."
+    }
+  }
+}

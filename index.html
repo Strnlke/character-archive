@@ -117,6 +117,7 @@
             <label class="quiet fileLabel" for="coverInput">↑ Upload cover</label>
             <input id="coverInput" type="file" accept="image/png,image/jpeg,image/webp" hidden>
             <button id="removeCoverBtn" class="quiet" type="button">Remove cover</button>
+            <button id="importCharacterNovelBtn" class="quiet" type="button">⇩ Import character</button>
             <button id="novelViewDeleteBookBtn" class="dangerOutline" type="button">Delete book</button>
             <button id="novelViewNewCharacterBtn" class="primary" type="button">＋ New character</button>
           </div>
@@ -197,13 +198,37 @@
               <button id="removePortraitBtn" type="button" class="textButton">Remove portrait</button>
             </div>
           </div>
-          <div class="profileHeaderActions"><button id="revisionHistoryBtn" class="quiet" type="button">↶ Revision history</button><button id="deleteCharacterBtn" class="dangerText" type="button">Delete character</button></div>
+          <div class="profileHeaderActions"><button id="importCharacterProfileBtn" class="quiet" type="button">⇩ Import updates</button><button id="revisionHistoryBtn" class="quiet" type="button">↶ Revision history</button><button id="deleteCharacterBtn" class="dangerText" type="button">Delete character</button></div>
         </div>
         <div id="sections"></div>
       </section>
     </main>
   </div>
 
+  <input id="characterImportFile" type="file" accept=".json,application/json" hidden>
+  <dialog id="importMatchDialog" class="importMatchDialog" aria-labelledby="importMatchTitle">
+    <div class="dialogBody">
+      <h2 id="importMatchTitle">Check possible matches</h2>
+      <p id="importMatchDescription" class="helper"></p>
+      <div id="importMatchList" class="importMatchList"></div>
+      <div class="dialogActions"><button id="importMatchCancel" type="button" class="quiet">Cancel</button><button id="importMatchCreate" type="button" class="primary">Create new instead</button></div>
+    </div>
+  </dialog>
+  <dialog id="importCompareDialog" class="importFullDialog" aria-labelledby="importCompareTitle">
+    <div class="importDialogBody">
+      <div class="importDialogHeading"><div><p class="eyebrow">CHARACTER IMPORT · REVIEW ONLY</p><h2 id="importCompareTitle">Compare character</h2><p id="importCompareHint" class="helper"></p></div><button id="importCompareClose" type="button" class="quiet">Cancel</button></div>
+      <div class="importCompareColumnTitles"><strong>Existing profile <span>(editable draft)</span></strong><strong>Proposed update <span>(read-only · copyable)</span></strong></div>
+      <div id="importComparisonFields" class="importComparisonFields"></div>
+      <div class="importFooter"><p id="importCompareStatus" role="status">Nothing is saved until you choose Save changes.</p><div class="dialogActions"><button id="importCompareCreateDifferent" type="button" class="quiet">Create as new character</button><button id="importCompareCancel" type="button" class="quiet">Cancel</button><button id="importCompareSave" type="button" class="primary">Save changes to USB</button></div></div>
+    </div>
+  </dialog>
+  <dialog id="importNewDialog" class="importFullDialog" aria-labelledby="importNewTitle">
+    <div class="importDialogBody">
+      <div class="importDialogHeading"><div><p class="eyebrow">CHARACTER IMPORT · UNSAVED DRAFT</p><h2 id="importNewTitle">New Character Editor</h2><p class="helper">Review and edit these fields. The character is created only when you select Save new character.</p></div><button id="importNewClose" type="button" class="quiet">Cancel</button></div>
+      <div id="importNewFields" class="importNewFields"></div>
+      <div class="importFooter"><p id="importNewStatus" role="status">No character file has been created.</p><div class="dialogActions"><button id="importNewCancel" type="button" class="quiet">Cancel</button><button id="importNewSave" type="button" class="primary">Save new character</button></div></div>
+    </div>
+  </dialog>
   <dialog id="nameDialog">
     <form method="dialog" id="nameForm" class="dialogBody">
       <h2 id="nameDialogTitle">New item</h2>

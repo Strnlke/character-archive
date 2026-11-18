@@ -1,79 +1,72 @@
-# Character Bookshelf v3.6 — Timeline & Library Tools
+# Character Bookshelf v3.7 — Character Import Review
 
-An offline-data, static-browser application for writing reference profiles. This version preserves the existing USB folder library format and does not require Azure, Microsoft sign-in, or new accounts. The website still needs to load from GitHub Pages over HTTPS (or be served locally in a compatible secure browser context).
+This release adds a **review-first** JSON importer to the existing Character Bookshelf v3.6 USB application. No Microsoft accounts or cloud sign-in are required.
 
-## What changed
+## What's new
 
-**1. Character timeline**
-- In **All Characters**, click **Timeline**. It is also accessible from the Character Tree and each character profile.
-- Add an event directly to the timeline, or open a character profile → **Story Information** → **Timeline events** → **Add event**.
-- Each event is stored once in the book's `timeline.json` file. It includes a title, optional year, optional relative/exact date text, notes, and zero or more character IDs.
-- Filter the same events by individual character, or return to the novel-wide chronological view.
-- Assign a year yourself, leave it undated, and change event order **within a year** with the up/down buttons or drag-and-drop. To move to another year, first edit that event's year.
-- Events entered through a character profile appear on the novel timeline automatically. **Existing freeform Important Events notes are not parsed or turned into events.** The application does not infer or invent story facts.
-- Timeline changes have the current page's one-step Undo. An event added from a character's profile uses that character's page-specific Undo.
+- **Import character** on a novel's **All Characters** screen and **Import updates** on individual profiles.
+- Accepts `.json` files exported from Character Bookshelf as well as compact `character-bookshelf-update` JSON files prepared from a conversation.
+- **Existing character:** Matches in the selected novel by internal character ID or exact name. Opens a side-by-side comparison, organized into the six profile sections. **Left** is an editable draft of the existing character; **right** is a read-only proposed update, with selectable text and Copy buttons. Proposed fields are shown first, and sections with no proposed changes start collapsed.
+- **No automatic merge:** Imported text NEVER replaces existing content merely because a file was opened. Copy or type only what you want into the left side. Select **Save changes to USB** to commit your reviewed draft, or **Cancel** without writing.
+- **New character:** When no match is found, opens the **New Character Editor** with all six editable sections prefilled for review. No character is created until **Save new character** is selected. Cancel discards the unsaved draft.
+- **Possible duplicate:** Similar names open a choice to compare with an existing profile or intentionally create a new one. The app blocks accidentally creating a second character with the exact same name in the same novel.
+- **Safer saving:** Before saving an update to an existing character, the app rechecks the source file for external changes; if it changed, the import is blocked so the newer USB file is not overwritten. An existing-character import also saves a revision snapshot before writing the approved change.
+- **Relationship safety:** Existing internal relationship links and portrait metadata stay untouched. Incoming relationship UUIDs from an exported file are not copied because they may point to characters in another library; relationship notes are available for manual review.
 
-**2. Universal Search**
-- Use **Search library** at the top.
-- Searches names, individual character fields, notes, and structured timeline event text across all novels belonging to the selected writer.
-- Results open the relevant profile or timeline entry. Search reads the chosen USB library locally; no index or private writing is sent to a server.
+## Installation
 
-**3. Uploaded book covers only**
-- In a novel's All Characters page, click **Upload cover**. Choose JPG/PNG/WebP (10 MB maximum).
-- The original image is copied into that novel's USB folder as `cover.jpg`, `cover.png`, or `cover.webp`, and referenced by its existing `novel.json` file.
-- **Remove cover** restores the existing default book design. No covers are generated.
+1. Back up the entire **Character Bookshelf** folder on your flash drive to a separate location.
+2. Extract the release ZIP, and upload **all three files together** — `index.html`, `app.js`, and `styles.css` — to the GitHub Pages repository currently hosting Character Bookshelf. Replace the older copies.
+3. Commit, wait for the GitHub Pages deployment to succeed, then open the application and press **Ctrl + Shift + R**.
+4. Open your existing USB folder, writer, and book. Click **Import character** or **Import updates** and select a `.json` file.
+5. For your first test, use **a backup copy** of your library and an imported update with harmless test notes. Confirm Cancel leaves the character unchanged and Save applies only your edited fields.
 
-**4. Character Revision History**
-- Each character profile now has a **Revision history** button.
-- Character Bookshelf saves a copy of the prior on-disk JSON profile before the next edit, then no more than one automatic snapshot per 15 minutes per character. It keeps up to 12 snapshots per character in `revisions/<character-ID>/` under the novel folder.
-- Preview a JSON snapshot or restore it. Restoring first backs up the current on-disk profile.
-- This is not a replacement for a complete USB library backup. Deleted books and characters (and their revision folders) cannot be recovered through Undo.
+The selected novel is the destination for imports. Neither the imported data nor your notes are sent to GitHub; the importer runs in your browser.
 
-**5. Character Tree export**
-- In **Character Tree**, choose **PNG** to download a full image (including offscreen manually arranged cards and relationship lines).
-- Choose **PDF / Print** to open a print-friendly page. Use the browser's print dialog and select **Save as PDF**. Complex or very large diagrams may be scaled to fit printed paper; use PNG for the full-resolution visual.
+## Update file format
 
-## Updating GitHub Pages
+A proposed update can contain only the fields that are relevant. You can ask ChatGPT to create a compatible JSON file after discussing a character, **using only the story details you confirm**.
 
-1. **Back up your entire existing USB library first** using **Back up library** or File Explorer. Keep that copy in a different location.
-2. Extract this ZIP.
-3. Replace **all three** application files (`index.html`, `app.js`, `styles.css`) in the GitHub repository and folder currently hosting Character Bookshelf. Upload the three files together; do not mix versions.
-4. Commit, confirm Pages has deployed, and reload the website with **Ctrl + Shift + R**.
-5. Select your USB folder again and open your existing writer/book. No file migration is required. The app continues to recognize existing `Character Archive` and `Character Bookshelf` libraries.
-6. For a safe first test, use a **copy** of your USB library or an empty test location.
-
-## Compatibility / data structure
-
-Existing files are left in place: `character-archive-manifest.json`, writer folders, each novel's `novel.json`, `characters/`, `portraits/`, and `character-tree.json` are still supported. New data is added only when a feature is used:
-
-```
-Character Bookshelf/
-  character-archive-manifest.json
-  Aaron/
-    Novel Title/
-      novel.json
-      cover.png                    (optional, uploaded image)
-      timeline.json                (when the first event is saved)
-      character-tree.json          (existing tree layout)
-      characters/
-        <character-name>--<id>.json
-      portraits/
-      revisions/                   (when first revision is needed)
-        <character-id>/
-          <timestamp>.json
+```json
+{
+  "format": "character-bookshelf-update",
+  "version": 1,
+  "character": {
+    "name": "Sample Character"
+  },
+  "sections": {
+    "background": {
+      "history": "Example background text to review."
+    },
+    "personality": {
+      "traits": "Example personality text."
+    }
+  }
+}
 ```
 
-## Tests performed
+The importer recognizes these section names and text fields:
 
-- Node 22 JavaScript syntax check.
-- Headless Chromium DOM and File System Access simulations: creating writer/book/character; saving structured events from a character profile; linking a second character; filtering; assigning year; moving events with arrows and drag-and-drop; per-page undo; searching saved profile notes; uploading a PNG cover and displaying it on the bookshelf; producing revision snapshots and restoring a previous profile; creating a tree relationship; exporting a complete tree to PNG.
-- Legacy-library simulation: opened a pre-v3.6 `Character Archive` folder, read a saved character, opened an empty new timeline, searched existing profile fields, and verified that no new `Character Bookshelf` folder was created.
-- **Not tested on your physical USB drive or GitHub Pages deployment in this release.** Real hardware testing remains necessary before trusting valuable writing to this version.
+| Section | Supported fields |
+| --- | --- |
+| `basic` | `fullName`, `age`, `occupation`, `appearance`, `notes` |
+| `personality` | `traits`, `fears`, `beliefs`, `motivations`, `notes` |
+| `background` | `history`, `experiences`, `notes` |
+| `relationships` | `notes` (not imported relationship IDs) |
+| `story` | `role`, `timeline`, `events`, `notes` |
+| `freeform` | `notes` |
 
-## Limitations
+The JSON file must include a name and may include any subset of supported text fields. Missing fields are presented as **No proposed change**; they do not imply deletion. An existing complete Character Bookshelf character JSON file is also accepted. If a character name in the source does not match exactly but is close to an existing name, the app asks you to choose.
 
-- The application doesn't automatically discover removable drives. Select a folder each session, as planned.
-- Character Tree export produces a visual PNG; PDF uses the browser's Print / Save as PDF workflow.
-- Profile revisions are lightweight snapshots, not unlimited history or a full backup.
-- One-step Undo is page-specific and session-only. Confirmed permanent deletion is not undoable.
-- Avoid using the same USB library simultaneously from two computers. Always wait for **Saved to folder** before ejecting the drive.
+A sample file named `Example_Character_Update.json` is included for testing. It is **placeholder content**, not material for any of your novels.
+
+## Notes and limitations
+
+- The comparison is a **local, staged editor**: no writing to USB until you approve Save. Closing or canceling discards draft edits.
+- The new-character import uses a focused full-screen editor with the same six sections; character links, portraits, and structured timeline events can be added using the regular profile and novel controls after creation.
+- Import source relationships are text only; linked-character identifiers do not transfer from a different library. Timeline events in `timeline.json` are also not imported by character update files.
+- The browser may ask before you leave the page if an import review is still open. Review draft contents do not survive reloading the website.
+- JSON import files are limited to 1 MB; only known text fields are used. No automatic story extraction or inference takes place in Character Bookshelf.
+- One-step Undo remains page-specific. Import updates create a revision snapshot for existing characters, but importing does not establish a multi-step Undo history.
+- Existing writer profiles, book folders, timelines, pictures, links, and exports use the established v3.6 storage format; there is no migration.
+- **Verification:** Node.js JavaScript syntax check plus automated Chromium tests with simulated USB storage passed for existing-profile import, cancel, manual editing, save, new-profile review/cancel/save, exact and similar-name duplicate checks, external-change conflict blocking, native profile import, and malformed JSON rejection. **Not yet verified on your physical USB or the deployed GitHub Pages site.**

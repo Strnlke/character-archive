@@ -220,3 +220,39 @@
 @media(max-width:750px){.timelineFormGrid{grid-template-columns:1fr}.timelineToolbar{gap:8px}.timelineRowActions{flex-direction:column}.timelineEventOpen{padding:12px}.timelineYear{font-size:17px}.profileHeaderActions{width:100%;align-items:flex-start}.searchBar{align-items:stretch;flex-direction:column}.treeHeadingActions{justify-content:flex-start}}
 
 .timelineCard[draggable="true"]{cursor:grab}.timelineCard.dragOver{border-color:#b5d8ff;background:#294b6b;box-shadow:0 0 0 2px #9fc9fb66}
+
+/* v3.7 — deliberate, read-only source / editable draft import review */
+.importFullDialog{width:min(96vw,1120px);max-width:1120px;height:min(91vh,900px);max-height:91vh;padding:0;overflow:hidden;border:1px solid #4c6482;border-radius:14px;background:#101d2d;color:#edf4ff}
+.importFullDialog[open]{display:flex;flex-direction:column}
+.importFullDialog::backdrop,.importMatchDialog::backdrop{background:rgba(2,7,15,.82)}
+.importDialogBody{display:flex;flex-direction:column;min-height:0;min-width:0;width:100%;height:100%}
+.importDialogHeading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding:20px 25px;border-bottom:1px solid #334963;background:#17283b}
+.importDialogHeading h2{margin:2px 0 7px;font-size:22px}
+.importDialogHeading p{margin:0;line-height:1.5}
+.importDialogHeading .helper{max-width:850px;color:#aabdd4}
+.importCompareColumnTitles{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 25px 10px;background:#111f31;color:#e5f1ff}
+.importCompareColumnTitles strong{font-size:13px}
+.importCompareColumnTitles span{color:#9cafc7;font-size:11px;font-weight:400}
+.importComparisonFields,.importNewFields{overflow-y:auto;min-height:0;flex:1;padding:0 25px 24px}
+.importSection{border:1px solid #364d68;border-radius:10px;margin-top:13px;background:#152539;overflow:hidden}
+.importSection>summary{padding:12px 17px;background:#213750;font-weight:750;color:#f1f6ff;cursor:pointer}
+.importSectionBody{padding:7px 13px 13px}
+.importFieldPair{display:grid;grid-template-columns:1fr 1fr;gap:12px;border-bottom:1px solid #2d425d;padding:11px 0}
+.importFieldSingle{padding:11px 0;border-bottom:1px solid #2d425d}
+.importFieldPair:last-child,.importFieldSingle:last-child{border:0}
+.importFieldCell{display:flex;flex-direction:column;gap:6px;min-width:0;font-weight:400}
+.importFieldName{font-size:12px;color:#c8d7e7;font-weight:700}
+.importFieldCell input,.importFieldCell textarea{width:100%;box-sizing:border-box;background:#0d1b2b;border:1px solid #41607e;border-radius:7px;color:#f3f7ff;padding:10px 11px;font:inherit;font-size:13px;resize:vertical}
+.importFieldCell textarea{min-height:74px}
+.importFieldCell textarea:focus,.importFieldCell input:focus{outline:2px solid #7aaee2;outline-offset:1px}
+.importFieldCell .importProposedInput{background:#223144;border-style:dashed;border-color:#526f8d;color:#e0ecfb}
+.importProposedInput::placeholder{color:#8295ab}
+.importCopy{align-self:flex-end;font-size:11px;padding:6px 12px}
+.importFooter{padding:13px 24px;background:#17283b;border-top:1px solid #3a516b;display:flex;gap:15px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.importFooter p{font-size:12px;margin:0;max-width:490px;color:#b8cce3}
+.importFooter .dialogActions{margin:0;display:flex;gap:8px;flex-wrap:wrap}
+.importMatchDialog{width:min(94vw,600px);max-height:85vh;overflow:auto}
+.importMatchList{display:flex;flex-direction:column;gap:8px;margin:15px 0}
+.importMatchOption{display:block;text-align:left;width:100%;border-radius:8px;padding:12px 15px;border:1px solid #42688f;background:#243f5a;color:#f4f8ff;font-weight:750}
+.importMatchOption:hover{background:#345878}
+@media(max-width:700px){.importFullDialog{width:98vw;height:94vh;max-height:94vh}.importDialogHeading{padding:13px}.importCompareColumnTitles{padding:10px 13px}.importComparisonFields,.importNewFields{padding:0 11px 14px}.importFieldPair{gap:7px}.importFieldCell input,.importFieldCell textarea{font-size:12px;padding:8px}.importFooter{padding:10px}.importFooter .dialogActions{width:100%;justify-content:flex-end}.importDialogHeading h2{font-size:18px}}
