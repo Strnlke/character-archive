@@ -1,70 +1,41 @@
-## v4.0.2 hotfix — Relationship Tree Colors
+# Character Bookshelf v4.1 — Series & Manuscript Update
 
-The v4.0.1 tree renderer assigned each relationship a distinct muted color, but older CSS `stroke`/`fill` declarations overrode those assigned colors. This update removes the conflicting rules for the relationship lines, their glow, label text, and label borders. It does not alter any saved character files or change the manuscript reader.
+Character Bookshelf is a locally stored writing-reference application for writer profiles, novels, characters, relationship trees, structured timelines, manuscript reference copies, and writer backups. The library remains in a folder you explicitly authorize (typically a USB flash drive). The application does not synchronize your records to a cloud account.
 
-**Install:** Replace `index.html`, `app.js`, and `styles.css` together in the GitHub Pages repository, commit, and reload the site after deployment (when no edits are pending). The HTML cache-busting query is updated to `4.0.2`. Your USB library does not need any migration.
+## Install / upgrade from v4.0.2
 
-**Test:** Open Test Novel → Character Tree. Confirm that Spouse/partner, Sibling, Dating/romantic partner, and Ex-spouse appear in subtly different colors; the legend should match each connection. Check a PNG export to ensure its colors remain correct.
+1. **Export a writer ZIP backup and separately copy your entire existing Character Bookshelf USB folder.** Verify that your originals are safely retained before testing an update.
+2. Extract this ZIP. In your GitHub repository's existing `character-archive` Pages root, replace **`index.html`, `app.js`, and `styles.css`**, and add **`series-v41.js`, `manuscript-v41.js`, `tutorial.html`,** and the **entire `tutorial-assets/` folder**. Keep those filenames and directories exactly as supplied; all assets are local and load alongside `index.html`.
+3. Commit and allow GitHub Pages to deploy, then refresh the page when no edits are pending. The HTML requests versioned `?v=4.1` JS and CSS assets to help avoid stale browser cache.
+4. Open your usual USB library. Start with a **copied test library** or a disposable writer before opening important work. Check the storage-status panel and verify at least one normal save and writer ZIP backup.
+5. Leave the prior v4.0.2 source files available as a rollback option. **Do not restore an older source while unsaved edits are pending.**
 
-**Verification:** Tested CSS/SVG rendering under local Chromium. Deployment on the live GitHub Pages site and actual USB remain to be checked.
+**Supported for USB-folder access:** recent desktop Chrome and Edge using HTTPS (e.g., GitHub Pages) or localhost and their File System Access API. Other browsers may not support the same folder authorization workflow. The reader is responsive, but browser file-system permissions and pop-out window behaviors vary by platform.
 
-## v4.0.1 hotfix
+## Five feature areas
 
-The v4.0 sticky navigation did not remain pinned in the user's deployed browser. v4.0.1 uses a fixed top bar with its actual height measured by a `ResizeObserver` so it stays on screen and does not hide page content, including after toolbar buttons wrap. This is a **navigation hotfix only**; existing v4.0 manuscript and library features are unchanged.
+**1. Character mentions while reading manuscripts.** An additional character sidebar in the read-only TXT and DOCX viewer lists **all characters from that book**, including zero-match profiles. Choose a character to view grouped mentions, their context, and next/previous navigation; click a mention to jump and highlight. Searches match whole words and user-entered **Aliases & nicknames** (Basic Information). The existing native **PDF viewer still works**, but character mention counts/jumps/highlights **are not yet available for PDF**, because browser-native PDF text cannot reliably be queried by this app.
 
-**Install:** Commit **all three** files (`index.html`, `styles.css`, `app.js`) from this release to your GitHub Pages repository, replacing the corresponding v4.0 files. The `index.html` asset references now include `?v=4.0.1` so the browser requests the updated stylesheet and application script. After deployment, refresh the page when no edits are pending, select the USB library as usual, and confirm that scrolling leaves the toolbar visible. If you need to roll back, use the original v4.0 release snapshot.
+**2. Smaller volatile RAM recovery.** Imported manuscript reference files (PDF, DOCX and TXT) are intentionally omitted from the emergency RAM snapshot, leaving more memory for irreplaceable character and novel information. Essential JSON data is prioritized. This temporary snapshot is cleared by reload, browser close or crash. **Normal exported writer ZIPs STILL INCLUDE manuscripts.** The source manuscripts should also be stored independently. Old imported files are not silently deleted when the application cannot confirm that they're an unchanged reference copy.
 
-**Testing:** The top bar remained pinned in simulated Chromium scrolling tests at 1366px, 800px, 600px, and 390px viewport widths, with no content overlap at the top of the page. This has **not** yet been tested against the user's live website or physical USB library.
+**3. Illustrated, optional tutorial.** Select **Getting Started Tutorial** on the writer selection screen after selecting a storage location, or **Tutorial** in the footer from any application page. The full text-and-screenshot guide has nine clickable subjects, enlarged-image links, and a **Pop out** button for side-by-side practice. Nothing launches automatically. The guide is release-specific and should be updated with subsequent feature releases.
 
----
+**4. Cached, writer-specific search index.** Repeated library searches use a temporary in-memory index rather than re-reading each character JSON file on every query. The index is invalidated on tracked saves and Refresh View, and also ages out (90 seconds) to limit stale results after external edits. Exact whole-word search behavior and result navigation remain intact.
 
-# Character Bookshelf v4.0.1 — Sticky Navigation Hotfix
+**5. Linked novel Series.** Create an optional named series and link existing books; use arrows to order them. Linked covers are placed next to one another on the bookshelf. The Series page combines existing per-novel timelines without duplicating event records. Entries without an explicit year/date remain in **Undated / relative events**, labeled with their source book. **Copy character** creates a new independent profile/portrait in another linked book. Relationship references are deferred until both copied endpoints exist; then they resolve to the new IDs. Once established, each book's character edits and relationships remain independent. A manually deleted copied relationship is not auto-recreated. A character already copied from the exact source book is detected; similarly named but unrelated profiles require user confirmation.
 
-**Upgrade from v3.9.** This release keeps the existing manually selected USB/library-folder storage model, writer profiles, per-character JSON files, backups, import review, revision history, timelines, and v3.9 emergency recovery. It does not upload the library to a server. No change to the existing character profile schema is required.
+## Storage, compatibility, and known limits
 
-## What changed
+- **No library migration is needed.** Existing novel, timeline and character files retain their formats; optional series data is stored as `character-bookshelf-series.json` in each writer's folder. Copied character profiles can add provenance and pending-link fields; existing profiles are not mass-modified.
+- Writer ZIP backups include series metadata and imported manuscripts. Emergency RAM snapshots exclude manuscript bytes. Recovery never replaces a permanent, independently stored backup.
+- Complex DOCX layout may not reproduce precisely. PDF character mention indexing remains unavailable in v4.1; PDF page navigation stays with the native viewer.
+- Series timelines use explicitly entered years or parseable absolute dates. They never guess a year from relative descriptions. Undated items are identified by source book.
+- The initial character index for a huge writer library still needs a scan; repeated searches benefit most. Indexes are volatile and intentionally temporary.
+- Browser pop-up blockers may require allowing the tutorial pop-out on your GitHub Pages site.
+- Source files are unminified. The existing bundled JSZip notices are retained in `app.js` and `THIRD_PARTY_LICENSES.md`.
 
-1. **Sticky top navigation.** The top bar stays available while scrolling. On narrow screens the toolbar buttons can be scrolled horizontally rather than stacking across many rows.
-2. **Subtle relationship colors.** Each of the 27 existing relationship types has its own muted line color, including in exported tree PNG/PDF images. Expand **Relationship color legend** below the tree to see the color meanings. Names and type labels remain visible as well.
-3. **Read-only manuscript reader.** Every novel has a **Manuscript** button directly below its bookshelf cover and another button alongside **Character tree** and **Timeline** on All Characters. Import DOCX, PDF, or TXT, read it inside Character Bookshelf, replace it with a newer reference copy, or remove the reference copy. No manuscript editing controls are supplied.
-4. **Application footer and full release history.** The bottom-of-page footer displays Character Bookshelf, Storage status, Release notes, and the running app version. Release notes include **v1.0 through v4.0**. The v1.0 entry documents the move from unsuccessful cloud-storage integration to USB storage. The earlier unfinished cloud prototype is not counted as a release.
-5. **Refined breadcrumbs.** The existing navigation shortcuts remain, with a clearer current-page indicator.
-6. **Active-page highlighting.** Subtle highlighting identifies selected navigation sections without changing their behavior.
-7. **Responsive layouts.** Improved spacing and controls for narrower displays, including a compact mobile header and collapsible-width manuscript contents navigation.
+## Verification
 
-## Install on your existing GitHub Pages site
+See **`QA_REPORT.md`** for test scope, results, and environment limits. This release was tested in a disposable simulated Chromium USB file system; it was **not** tested against your real flash drive or the deployed GitHub Pages site. Preserve a separate backup and verify a few test saves before using it for unrecoverable work.
 
-1. **Back up your full USB `Character Bookshelf` folder** to another physical location. Keep a copy of the working v3.9 code too.
-2. Extract `Character_Bookshelf_v4_0_Release.zip`.
-3. Replace the **same three files** in your `character-archive` GitHub repository: **`index.html`, `app.js`, `styles.css`**. Upload them together to the root directory, not into a subfolder. The Word-reading library is already bundled into `app.js`; there are **no extra script or vendor files to upload**.
-4. Commit, let GitHub Pages finish deploying, then load the site with **Ctrl + Shift + R** once (only when you are not recovering unsaved edits).
-5. Re-select your normal USB library folder, choose a writer, and test the Manuscript button first with **Test Novel** or a copied test library.
-
-Your writer, character, relationship, and timeline records are unchanged by the version upgrade itself. The manuscript reference is an optional addition to a novel's `novel.json` and book folder when you import one.
-
-## Manuscript Reader — storage and behavior
-
-- **File formats:** DOCX, PDF, TXT (up to **64 MiB per imported file**).
-- **Copies, not links:** The imported manuscript is saved as a **new, separately named file** within that novel's USB folder. The source document on your PC is never edited. `novel.json` holds the copied file name, original file name, and import timestamp.
-- **DOCX:** Locally parses the Word document into readable paragraphs and chapter headings, without external network calls. Detects styled headings and headings such as `Chapter 1`. Tables may be flattened; photos, footnotes, complex page geometry, floating elements, and exact Word typography are **not fully reproduced**. It is a reference reader, not a Word renderer.
-- **TXT:** Shows the complete text and detects conventional `Chapter`/`Part` headings when present.
-- **PDF:** Opens the PDF in the browser's built-in viewer with its original page layout. Use native viewer controls/bookmarks where supported, or enter a PDF page number using the application's **Page / Go** control. PDF chapter headings are **not automatically extracted** into the chapter panel.
-- **Reading position:** TXT/DOCX scroll position and the PDF page entered using **Page / Go** can be remembered **per browser on that device**, using that browser's local storage. Reading positions are not copied to the USB library or synchronized between computers.
-- **Replacing manuscripts:** Requires confirmation. The original source file remains untouched. An old imported copy is removed only when its contents can be verified as unchanged; otherwise it is retained to avoid losing data.
-- **Backups and recovery:** Because the imported file is inside the novel folder, existing **writer ZIP backups** include it. The v3.9 volatile snapshot can include it subject to its **384 MiB total RAM snapshot cap**. If the app reports a partial snapshot, do not assume the manuscript was recovered.
-- **Read-only means inside this application:** The viewer does not edit the imported copy. Your browser's native PDF viewer may provide its own separate download or annotation tools, but the imported USB manuscript is not modified through them.
-
-## Visual changes and legacy compatibility
-
-- Existing sidebar buttons, writer switching, library search, undo, character imports, galleries, relationship editing, timeline controls, ZIP backup/restore, and emergency recovery remain available.
-- Relationship colors do **not** change saved relationship type names or tree metadata.
-- The footer is at the **bottom of the document**, not fixed to the screen; only the top bar is sticky.
-- The entire v1.0–v4.0 release history is available by clicking **Release notes** in the footer.
-
-## QA and limitations
-
-Automated Chromium testing with a **simulated File System Access API** passed for: writer/novel selection; v1.0–v4.0 release history display; bookshelf Manuscript button; local DOCX parsing and two-chapter navigation; PDF viewer URL/page controls; TXT import; manuscript replacement; ZIP backup containing the binary manuscript plus matching novel metadata; 27 distinct line colors and colored SVG exports; snapshot awareness of manuscript files; sticky top bar; and no unexpected JavaScript errors. A narrow-screen test found no unintended page-wide horizontal overflow.
-
-**Not yet verified against your actual USB flash drive, production GitHub Pages deployment, or every browser's native PDF renderer.** Please test with *Test Novel* first. Preserve v3.9 for rollback and keep independent backups of your writing. The pre-existing file-conflict checks are best-effort, not operating-system file locks.
-
-**Note:** The complete reader lives in the app, and the third-party JSZip MIT notice is included in `app.js` and `THIRD_PARTY_LICENSES.md`. No online package CDN or account is required.
+See **`RELEASE_HISTORY.md`** for earlier releases.

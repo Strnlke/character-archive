@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Character Bookshelf v4.1 · Getting Started</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#111a26;color:#e8f1fa}
+*{box-sizing:border-box}body{margin:0}.tutorialHeader{height:auto;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:18px 27px;border-bottom:1px solid #39506a;background:#152233}
+.tutorialBrand{font-weight:800;font-size:16px;letter-spacing:.01em}.tutorialVersion{font-size:12px;color:#b7c9dd;margin-left:8px}.tutorialLayout{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:calc(100vh - 80px)}
+nav{position:sticky;top:0;align-self:start;max-height:calc(100vh - 76px);overflow:auto;padding:24px 12px;border-right:1px solid #35475d;background:#172335}
+nav h2{font-size:11px;letter-spacing:.11em;color:#a5bad0;padding:0 12px}nav a{display:block;color:#b8cbde;text-decoration:none;font-size:13px;padding:11px 13px;margin:3px 0;border-radius:8px;border:1px solid transparent}
+nav a:hover,nav a.active{background:#2b4964;color:#fff;border-color:#547495}main{padding:clamp(18px,4vw,45px);max-width:990px;width:100%;margin:0 auto}
+.topic{display:none;animation:appear .15s ease-out}.topic.active{display:block}@keyframes appear{from{opacity:.5;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+h1{font-size:clamp(25px,3.6vw,35px);letter-spacing:-.035em;line-height:1.17;margin:0 0 15px}h2{font-size:20px;margin-top:24px}p,li{font-size:15px;line-height:1.75;color:#ccdaea}li{margin:7px 0}strong{color:#f4f6fb}a{color:#b9d9fb}.lead{font-size:16px;color:#c8d8e9;max-width:760px}ul,ol{padding-left:23px}
+.guideNote{border-left:3px solid #c4a977;background:#233246;color:#e0e7f0;padding:12px 17px;border-radius:0 9px 9px 0;margin:20px 0;font-size:14px;line-height:1.65}
+figure{margin:24px 0;border:1px solid #44586d;padding:9px;border-radius:12px;background:#18283a}figure img{display:block;width:100%;height:auto;max-height:520px;object-fit:contain;object-position:top center;border-radius:7px;background:#101821}figcaption{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;padding:10px 4px 2px;font-size:12px;color:#b1c6dd}.outlineBtn{border:1px solid #537395;padding:8px 12px;border-radius:8px;background:#27435d;color:#f1f8ff;font:inherit;font-size:12px;cursor:pointer;text-decoration:none}.outlineBtn:hover{background:#386084}
+.small{font-size:12px;color:#a9c0d8}.tutorialBottom{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:34px;padding-top:16px;border-top:1px solid #334a63}
+@media(max-width:720px){.tutorialLayout{grid-template-columns:1fr}nav{position:relative;max-height:none;padding:12px;border-right:0;border-bottom:1px solid #334a63;display:flex;overflow-x:auto;gap:5px}nav h2{display:none}nav a{white-space:nowrap;flex:none;margin:0;padding:8px 11px}main{padding:23px 17px}.tutorialHeader{padding:15px 18px}}
+@media print{.tutorialHeader button,nav,.tutorialBottom{display:none!important}.tutorialLayout{display:block}.topic{display:block!important;page-break-before:always}main{max-width:unset}figure{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header class="tutorialHeader"><div class="tutorialBrand">✦ Character Bookshelf <span class="tutorialVersion">Tutorial · v4.1</span></div><button class="outlineBtn" id="tutorialPopOut" type="button">↗ Open in separate window</button></header>
+<div class="tutorialLayout"><nav id="tutorialNav" aria-label="Tutorial topics">
+  <h2>TOPICS</h2>
+  <a href="#welcome" data-topic="welcome">Getting Started</a>
+  <a href="#writers" data-topic="writers">Writer Profiles</a>
+  <a href="#books" data-topic="books">Books &amp; Characters</a>
+  <a href="#relationships" data-topic="relationships">Character Tree</a>
+  <a href="#timeline" data-topic="timeline">Timelines</a>
+  <a href="#series" data-topic="series">Novel Series</a>
+  <a href="#reader" data-topic="reader">Manuscript Reader</a>
+  <a href="#search" data-topic="search">Search &amp; Imports</a>
+  <a href="#recovery" data-topic="recovery">Backups &amp; Recovery</a>
+</nav>
+<main>
+<section class="topic" id="welcome">
+<h1>Welcome to Character Bookshelf</h1>
+<p class="lead">A portable library for your novels, character profiles, relationships, and timelines. Your information stays in the storage folder you select.</p>
+<ol><li>Open the app using current Chrome or Edge over HTTPS (or localhost).</li><li>Choose <strong>Select location</strong> and select a writable folder or USB drive. Approve the browser permission request.</li><li>Character Bookshelf opens or creates its own <strong>Character Bookshelf</strong> subfolder.</li><li>On the writer selection screen, choose your writer or create a new profile.</li></ol>
+<figure><img src="tutorial-assets/startup.png" alt="Writer-selection screen after connecting the library, showing the optional Getting Started Tutorial button"><figcaption>Writer selection — the tutorial button is optional. <a href="tutorial-assets/startup.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<div class="guideNote"><strong>Find this guide anytime:</strong> Select <strong>Tutorial</strong> in the footer at the bottom of any Character Bookshelf page. For side-by-side practice, use <strong>Open in separate window</strong>; then return to the application in your main window.</div>
+<p>Nothing opens the tutorial automatically. Close it whenever you like, and use the topic links on the left to jump directly to a feature.</p>
+</section>
+<section class="topic" id="writers">
+<h1>Writer Profiles</h1>
+<p>Writer profiles separate different people’s libraries. They're organizational profiles, not password-protected accounts.</p>
+<ol><li>After choosing storage, select <strong>Create writer profile</strong>.</li><li>Enter the writer’s name and open their bookshelf.</li><li>Use <strong>Switch writer</strong> when moving between libraries.</li></ol>
+<figure><img src="tutorial-assets/bookshelf.png" alt="Writer bookshelf showing books, Recently Worked On and Series controls"><figcaption>Personal bookshelf and its novel controls. <a href="tutorial-assets/bookshelf.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<div class="guideNote">Writer deletion is permanent. Export and verify a writer ZIP backup before deleting a profile or changing storage hardware.</div>
+</section>
+<section class="topic" id="books">
+<h1>Books &amp; Characters</h1>
+<ol><li>Choose <strong>New novel</strong> on the bookshelf to create a book.</li><li>Select its cover to open the character gallery.</li><li>Choose <strong>New character</strong> and enter the name.</li><li>Fill in the six profile sections and allow the save status to confirm your changes.</li><li>Optional: add <strong>Aliases &amp; nicknames</strong> under Basic Information, separated with commas, semicolons, or new lines. Only variations you enter will be searched in the manuscript.</li></ol>
+<figure><img src="tutorial-assets/character.png" alt="Character editor showing the six sections and aliases and nicknames field"><figcaption>Character details stay in the selected novel’s folder. <a href="tutorial-assets/character.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<p>Images and book covers are optional. A character you copy between novels becomes a separate profile, so editing one does not modify its counterpart.</p>
+</section>
+<section class="topic" id="relationships">
+<h1>Character Tree</h1>
+<p>The Character Tree creates a visual map from the relationships stored in your character profiles.</p>
+<ol><li>Open a novel and choose <strong>Character tree</strong>.</li><li>Drag cards to arrange them, or drag one card onto another to create a relationship.</li><li>Choose relationship types and notes in the connection editor.</li><li>Use the legend for relationship colors, or export the tree to PNG or PDF.</li></ol>
+<figure><img src="tutorial-assets/tree.png" alt="Character tree with connected character cards and relationship lines"><figcaption>The relationship tree stays independent for each novel. <a href="tutorial-assets/tree.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<div class="guideNote">When you copy characters within a series, a relationship is transferred only after both endpoints exist in the destination book. Removing a copied relationship does not change the source book or recreate that deleted link later.</div>
+</section>
+<section class="topic" id="timeline">
+<h1>Timelines</h1>
+<p>Timelines organize structured events. Freeform notes are never automatically converted into timeline entries.</p>
+<ol><li>Open a novel’s <strong>Timeline</strong>.</li><li>Choose <strong>Add Event</strong> and enter a title. The year and date are optional.</li><li>Choose characters associated with the event and save it.</li><li>Use <strong>All Characters</strong> or <strong>By Character</strong> to change the view.</li></ol>
+<figure><img src="tutorial-assets/timeline.png" alt="Timeline of structured novel events including dated entries"><figcaption>Novel timeline: edits here are reflected in any linked Series view. <a href="tutorial-assets/timeline.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<p>An event without a sortable year remains undated; the application does not invent one. You can edit it later from its original book.</p>
+</section>
+<section class="topic" id="series">
+<h1>Novel Series</h1>
+<p>Series are optional. Linking books groups their covers on the bookshelf without moving or merging their files.</p>
+<ol><li>On the bookshelf, choose <strong>Series</strong>, then <strong>New series</strong>.</li><li>Link existing novels using <strong>Link book</strong>; move their order with the arrow controls.</li><li>Choose a source book, character, and destination book, then select <strong>Copy character</strong>.</li><li>Open the destination book to edit the copied profile independently.</li><li>See dated events from all member novels under <strong>Combined series timeline</strong>. Events with no sortable year appear under <strong>Undated / relative events</strong>, labeled by book.</li></ol>
+<figure><img src="tutorial-assets/series.png" alt="Series screen with linked books, character copying, and combined timeline"><figcaption>Series organization and combined chronology. <a href="tutorial-assets/series.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<div class="guideNote">The series timeline is read-only. Selecting an event opens its original book so you can edit it there. Unlinking a book or deleting a series grouping never deletes its underlying novel files.</div>
+</section>
+<section class="topic" id="reader">
+<h1>Manuscript Reader</h1>
+<p>Import a separate read-only copy of a <strong>DOCX, TXT, or PDF</strong> manuscript into a novel. Your original document stays wherever you keep it.</p>
+<ol><li>Open the book’s <strong>Manuscript</strong> page.</li><li>Select <strong>Import manuscript</strong>, then choose your file (up to 64 MiB).</li><li>For TXT and DOCX, select a character on the right to see mention counts, grouped previews, and Next/Previous controls. Choose a preview to jump and highlight the mention.</li><li>Use the chapter navigation and text-size controls for easier reading.</li></ol>
+<figure><img src="tutorial-assets/manuscript.png" alt="TXT manuscript reader with character mention sidebar and highlighted mention"><figcaption>Character mention navigation on a text-based manuscript. <a href="tutorial-assets/manuscript.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<div class="guideNote"><strong>PDF limitation:</strong> PDF files open in the browser's native PDF viewer, which does not expose precise text-match locations to this version. Use the browser PDF Find and page navigation. Character mention counts and jump-to-match highlighting are supported for TXT and DOCX only.</div>
+</section>
+<section class="topic" id="search">
+<h1>Search &amp; Imports</h1>
+<p><strong>Universal Search</strong> searches names, character fields, relationship information, novel titles and timeline events for the selected writer. Whole-word matching avoids false hits such as searching for “Ron” inside “chronic.”</p>
+<ol><li>Choose <strong>Search library</strong> from the navigation.</li><li>Enter a word or phrase and select <strong>Search</strong>.</li><li>Click a result to open the matching character or event.</li><li>Use <strong>Refresh View</strong> after editing files from another program to rebuild the temporary search index.</li></ol>
+<p>You can also import compatible character JSON files. Proposed edits can be compared with saved profiles before changes are committed. Nothing is automatically merged.</p>
+<div class="guideNote">The search index is temporary and is rebuilt when needed; it does not create a separate permanent database. External changes may not appear instantly until refreshed or the index becomes stale.</div>
+</section>
+<section class="topic" id="recovery">
+<h1>Backups &amp; Recovery</h1>
+<p>Protect your library by keeping verified backups separate from your primary USB drive.</p>
+<ol><li>Select <strong>Backup &amp; restore</strong>.</li><li>Export the current writer's ZIP. It includes characters, trees, timelines, portraits, book covers, series metadata, and imported manuscript copies.</li><li>Store the backup on a different device and periodically verify its contents.</li><li>Check <strong>Storage status</strong> to see write and recovery information.</li></ol>
+<figure><img src="tutorial-assets/storage.png" alt="Storage and recovery dialog showing RAM snapshot status"><figcaption>Storage status and temporary recovery snapshot. <a href="tutorial-assets/storage.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<div class="guideNote"><strong>Important:</strong> The temporary RAM recovery snapshot excludes imported PDF, DOCX, and TXT manuscript copies. Those are in regular ZIP backups, not emergency RAM recovery. Keep your original manuscript files. The snapshot disappears when the browser reloads, closes, or crashes.</div>
+<p>If the USB drive disconnects or a save fails, <strong>leave the tab open</strong>. Follow the on-screen recovery instructions and save recoverable files to a different location if offered. Some recovery copies may be incomplete. Wait for <strong>Saved</strong> before safely ejecting storage.</p>
+</section>
+<div class="tutorialBottom"><span class="small">Character Bookshelf v4.1 · Instructions correspond to this release.</span><span class="small">Return anytime through the footer’s Tutorial link.</span></div>
+</main></div>
+<script>
+(function(){
+ const anchors=[...document.querySelectorAll('[data-topic]')],topics=[...document.querySelectorAll('.topic')];
+ function navigate(){const selected=location.hash.slice(1);const id=topics.some(t=>t.id===selected)?selected:'welcome';
+  topics.forEach(t=>t.classList.toggle('active',t.id===id));anchors.forEach(a=>{a.classList.toggle('active',a.dataset.topic===id);if(a.dataset.topic===id)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');});window.scrollTo(0,0);
+ }
+ window.addEventListener('hashchange',navigate);navigate();
+ const btn=document.getElementById('tutorialPopOut');
+ btn.addEventListener('click',()=>{
+   const href=new URL('tutorial.html'+(location.hash||'#welcome'),location.href).href;
+   const child=window.open(href,'characterBookshelfTutorial','width=1050,height=800,resizable=yes,scrollbars=yes');
+   if(child)child.focus();else btn.textContent='Pop-up blocked — allow pop-ups for this site';
+ });
+ if(window.top===window)btn.hidden=true;
+})();
+</script>
+</body>
+</html>

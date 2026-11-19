@@ -459,3 +459,66 @@ html{scroll-padding-top:calc(var(--bookshelf-topbar-height) + 20px)}
    scroll-margin-top:calc(var(--bookshelf-topbar-height) + 16px);
  }
 }
+
+/* v4.1 — Series workspace; book files never move when linked. */
+.seriesView{max-width:1150px;margin:0 auto;animation:pageReveal .18s ease-out}
+.seriesHeading,.seriesHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.seriesHeading h1{font-size:clamp(28px,4vw,39px);margin:0 0 8px}
+.seriesHeading{margin:0 0 20px}.seriesHeading p{margin:0}
+.seriesList{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.seriesTab{background:#1d2d42;color:#b8cadf;border:1px solid #3b536d;border-radius:9px;padding:10px 16px;font-weight:700}
+.seriesTab.selected{background:#395d7e;color:#fff;border-color:#8cafce}
+.seriesDetails{border:1px solid #364b61;border-radius:15px;background:#162436;padding:clamp(15px,3vw,28px)}
+.seriesHeader h2{margin:0;font-size:23px}.seriesHeader p{margin:7px 0}
+.seriesHeaderActions,.shelfActionGroup{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.seriesBooks{display:flex;gap:16px;flex-wrap:wrap;padding:22px 0}
+.seriesBookCard{width:143px;display:flex;flex-direction:column;gap:6px;border-radius:11px;background:#203247;border:1px solid #41556b;padding:9px}
+.seriesMiniCover{height:165px;border:1px solid #8a93a6;border-radius:5px;background:linear-gradient(115deg,#5b5874,#273a50);box-shadow:inset 5px 0 10px #0005;display:grid;place-items:center;text-align:center;overflow:hidden;color:#f2e9dc;font-family:Georgia,serif;font-size:16px;padding:8px}
+.seriesMiniCover img{width:100%;height:100%;object-fit:cover}.seriesOrder{color:#adc3d9;font-size:11px;font-weight:700}
+.seriesOpen{border:0;background:transparent;color:#eef5ff;text-align:left;font-weight:700;line-height:1.3;padding:6px 0}
+.seriesBookActions{display:flex;gap:5px;margin-top:auto}.seriesBookActions button{padding:5px 8px;font-size:12px}
+.seriesBookActions .textButton{color:#dcb4a9}
+.seriesLinkBar{display:flex;align-items:end;gap:10px;flex-wrap:wrap;border-top:1px solid #34485f;padding:18px 0}
+.seriesLinkBar label{width:100%;color:#b6c9dc;font-size:12px}.seriesLinkBar select{min-width:min(350px,100%)}
+.seriesTools{border-top:1px solid #35485d;padding:25px 0 10px;margin-top:10px}
+.seriesTools h2{font-size:21px;margin:0 0 7px}.seriesTools>p{margin:0 0 17px;max-width:800px}
+.seriesCopyGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:12px;align-items:end}
+.seriesCopyGrid label{display:flex;flex-direction:column;gap:7px;color:#bacfe2;font-size:12px;min-width:0}
+.seriesCopyGrid select{width:100%;min-width:0}.seriesCopyGrid .primary{white-space:nowrap}
+.seriesEventGroup{margin:14px 0;border:1px solid #3c5369;border-radius:10px;overflow:hidden}
+.seriesEventGroup h3{margin:0;background:#253e58;border-bottom:1px solid #49637c;padding:11px 16px;font-size:18px}
+.seriesUndated h3{background:#3e3847}
+.seriesEvent{display:flex;flex-direction:column;gap:5px;text-align:left;color:#ecf4ff;background:#182b3f;border:0;border-bottom:1px solid #31485f;width:100%;padding:13px 17px}
+.seriesEvent:hover{background:#294563}.seriesEvent strong{font-size:14px}.seriesEvent span{font-size:12px}
+.seriesShelfLabel{color:#e4d0ac;border:0;background:transparent;font-weight:800;font-size:14px;padding:5px 21px}
+.seriesShelfLabel:hover{text-decoration:underline}
+@media(max-width:850px){.seriesCopyGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.seriesBookCard{width:135px}}
+@media(max-width:550px){.seriesCopyGrid{grid-template-columns:1fr}.seriesLinkBar select{min-width:0;width:100%}.seriesLinkBar button{width:100%}.shelfActionGroup{width:100%}.seriesHeader{gap:12px}}
+
+/* v4.1 — side-by-side character mention finder */
+.manuscriptReaderShell{display:grid;grid-template-columns:minmax(0,1fr) 268px;gap:0;border:1px solid #394c5f;border-top:0;border-radius:0 0 10px 10px;overflow:hidden;background:#162436}
+.manuscriptMain{min-width:0}.manuscriptReaderShell .manuscriptTextLayout,.manuscriptReaderShell .manuscriptPdfLayout{border:0;border-radius:0}
+.manuscriptMentionsPanel{min-width:0;border-left:1px solid #3a5065;background:#1a2a3c;padding:13px;max-height:740px;overflow:auto}
+.manuscriptMentionsPanel .readerAsideHeading{font-size:11px;letter-spacing:.08em}
+.manuscriptMentionsPanel>p{font-size:11px;line-height:1.6;margin:7px 0 13px}
+.manuscriptCharacterList{max-height:240px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.manuscriptCharacterButton{width:100%;display:flex;justify-content:space-between;gap:8px;align-items:center;text-align:left;background:#22374e;color:#d7e6f7;border:1px solid #354b65;border-radius:7px;padding:8px 9px;font-size:12px}
+.manuscriptCharacterButton.selected,.manuscriptCharacterButton:hover{background:#345b7e;color:#fff}
+.manuscriptCharacterButton.pdfUnavailable{opacity:.7;cursor:default}
+.mentionCount{background:#101f30;padding:2px 6px;border-radius:7px;font-size:11px;font-variant-numeric:tabular-nums}
+.manuscriptMatchesHeading{display:flex;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid #3e5369;padding-top:14px;margin-top:12px}
+.manuscriptMatchesHeading strong{font-size:12px;color:#d9e7f4}.manuscriptMatchesHeading button{padding:5px 9px;font-size:12px}
+.manuscriptMentionList{display:flex;flex-direction:column;gap:6px;margin-top:9px}
+.manuscriptMatchGroup{font-size:12px;color:#dcc6a4;margin:15px 0 3px;border-bottom:1px solid #425269;padding-bottom:5px}
+.manuscriptMentionExcerpt{border:1px solid #394c64;background:#1d344a;border-radius:7px;color:#c0d1e3;font-size:11px;text-align:left;line-height:1.5;white-space:normal;overflow-wrap:anywhere;padding:9px;width:100%}
+.manuscriptMentionExcerpt.selected,.manuscriptMentionExcerpt:hover{background:#385b77;border-color:#8cadca;color:#fff}
+.manuscriptActiveMark{background:#f4ca63;color:#1e252b;outline:2px solid #b37f24;border-radius:2px}
+@media(max-width:1050px){.manuscriptReaderShell{grid-template-columns:1fr}.manuscriptMentionsPanel{border-left:0;border-top:1px solid #435870;max-height:none}.manuscriptCharacterList{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));max-height:none}}
+
+/* v4.1 — optional in-app tutorial, independent pop-out available. */
+.tutorialDialog{width:min(1120px,96vw);height:min(850px,94vh);max-width:96vw;max-height:94vh;background:#142235;border:1px solid #56718b;border-radius:13px;padding:0;overflow:hidden;color:#f1f4f7}
+.tutorialDialog::backdrop{background:#050c15d9}
+.tutorialDialogBar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 17px;background:#25394d;border-bottom:1px solid #526983}
+.tutorialDialogBar>div{display:flex;gap:8px}.tutorialDialogBar strong{font-size:14px}
+.tutorialDialog iframe{border:0;display:block;width:100%;height:calc(100% - 66px);background:#111a26}
+@media(max-width:600px){.tutorialDialogBar{align-items:flex-start}.tutorialDialogBar strong{font-size:12px}.tutorialDialog iframe{height:calc(100% - 110px)}}

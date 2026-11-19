@@ -1,9 +1,17 @@
-## v4.0.2 — Relationship Color Hotfix
-
-- Corrected CSS overrides that caused all relationship tree connections to display the same light blue instead of their configured muted colors.
-- Updated label and connection border colors while preserving existing links, saved positions, and exports.
-
 # Character Bookshelf — Release History
+
+## v4.1 — Linked Novel Series, Manuscript Navigation & Reliability
+
+- Link novels within a named series, display them together on the bookshelf, and reorder them without moving the original folders.
+- Series page that merges per-book structured timeline events chronologically, with an explicit source-book label and a separate undated/relative-events section.
+- Copy characters and portraits between linked books as independent profiles. Relationships are deferred until both copied endpoints are available, then remapped to the destination IDs. Intentionally removed links remain removed.
+- TXT/DOCX manuscript character sidebar, confirmed aliases/nicknames, whole-word mention counts, chapter context, jump-to-occurrence highlights, and next/previous controls. The native PDF reader does not support precise mention indexing in this version.
+- Exclude imported manuscript reference bytes from volatile RAM recovery, prioritize essential JSON, and retain imported manuscripts inside regular writer ZIP backups.
+- Temporary writer-wide search index with save invalidation and staleness refresh.
+- Illustrated, optional tutorial with nine navigable topics, real v4.1 screenshots, pop-out window and a permanent footer Tutorial link.
+- Preserve the v4.0.2 fixed navigation and relationship colors, and existing USB library/character file formats.
+
+
 
 This is an archival summary of the release notes built into Character Bookshelf v4.0. Entries are based on the retained development releases, not the unfinished OneDrive-era prototype. Precise historical release dates are omitted where unverified.
 

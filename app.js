@@ -62,9 +62,10 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.0.2';
+const APP_VERSION = '4.1';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
+  ['4.1','Series & Manuscript Update',['Writer-level series organization, independently copied characters and deferred relationship links','Combined read-only series timelines with undated events separated','Character mention navigation for DOCX and TXT manuscripts; PDF page viewer retained','Smaller RAM recovery without manuscript copies; writer search index','Optional illustrated, pop-out tutorial with persistent footer access']],
   ['4.0.2','Relationship Color Hotfix',['Fixed an older CSS rule overriding relationship-specific tree line, label, and border colors','Preserved existing tree layout, links, exports, and library data']],
   ['4.0.1','Pinned Navigation Hotfix',['Top navigation remains visible while scrolling, including on narrower screens','Header height is measured automatically to prevent page content from being obscured','Updated stylesheet and script references to avoid using older cached assets']],
   ['4.0','Visual & Manuscript Reading',['Sticky navigation and clearer active-page indicators','Subtle, distinct relationship colors and a collapsible legend','Read-only DOCX, PDF and TXT reader with novel and bookshelf entry points','Version footer with complete release history','Responsive navigation and layout refinements']],
@@ -96,7 +97,7 @@ const state = {
   root: null, selectedLocation: null, manifest: null, writer: null, writerDir: null,
   novels: [], novel: null, novelDir: null, charsDir: null, portraitsDir: null,
   characters: [], active: null, saveTimer: null, saving: null,
-  revision: 0, savedRevision: 0, portraitUrl: null, galleryUrls: [], epoch: 0, treeMeta: null, treeRevision: 0, treeSavedRevision: 0, treeTimer: null, treeSaving: null, timelineEvents: [], timelineFilter: 'all', coverUrls: [], searchEpoch: 0
+  revision: 0, savedRevision: 0, portraitUrl: null, galleryUrls: [], epoch: 0, treeMeta: null, treeRevision: 0, treeSavedRevision: 0, treeTimer: null, treeSaving: null, timelineEvents: [], timelineFilter: 'all', coverUrls: [], searchEpoch: 0, series: [], activeSeries: null, searchIndex: null, searchIndexEpoch: 0
 };
 
 /* v3.9 — volatile recovery. Only file bytes are kept in RAM. A browser reload
@@ -133,7 +134,7 @@ async function recoveryPath(handle) {
   }catch{return null;}
 }
 function recoveryStore(path,data,version=null) {
-  if(path===null || !path || !data)return;
+  if(path===null || !path || !data || isManuscriptReferencePath(path))return;
   const previous=memoryRecovery.files.get(path);
   const size=memoryRecovery.bytes-(previous?.byteLength||0)+data.byteLength;
   if(size>RECOVERY_LIMIT || (previous===undefined&&memoryRecovery.files.size>=RECOVERY_FILE_LIMIT)) {
@@ -155,32 +156,61 @@ async function removeTrackedEntry(directory,name,options) {
   await directory.removeEntry(name,options);
   if(path)recoveryRemove(path,!!options?.recursive);
 }
+// Imported manuscripts are reference copies; their bytes do not belong in
+// volatile recovery. Only the metadata stays in memory. Normal ZIP writer
+// backups still include every manuscript.
+function isManuscriptReferencePath(path){
+  return /(?:^|\/)manuscript-[^/]+\.(?:docx|pdf|txt)$/i.test(String(path||''));
+}
+function eligibleRecoveryFileCount(){return memoryRecovery.files.size;}
 async function captureRecoverySnapshot() {
   if(!state.root || memoryRecovery.scanning)return;
   const scan=++memoryRecovery.scanId,root=state.root;
-  memoryRecovery.scanning=true;memoryRecovery.partialReason='Scanning the accessible library';
+  memoryRecovery.scanning=true;memoryRecovery.partialReason='Scanning accessible reference data (manuscripts excluded)';
   const scanVersion=memoryRecovery.writeSerial;
-  let count=0,finished=true,reason='';
+  let finished=true,reason='',count=0;
+  const entries=[];
+  // Collect handles first, then protect the hardest-to-replace files first.
   const walk=async(dir,prefix='')=>{
-    for await(const [name,entry] of dir.entries()) {
-      if(scan!==memoryRecovery.scanId || root!==state.root)throw Error('Snapshot interrupted by a library change.');
+    for await(const [name,entry] of dir.entries()){
+      if(scan!==memoryRecovery.scanId||root!==state.root)throw Error('Snapshot interrupted by a library change.');
       if(!name||name==='.'||name==='..'||name.includes('/')||name.includes('\\'))throw Error('Invalid library file name.');
       const path=prefix+name;
       memoryRecovery.handles.set(entry,path);
-      if(entry.kind==='directory'){await walk(entry,path+'/');continue;}
-      if(entry.kind!=='file')continue;
-      const data=new Uint8Array(await (await entry.getFile()).arrayBuffer());
-      count++;
-      if(memoryRecovery.bytes+data.byteLength>RECOVERY_LIMIT || count>RECOVERY_FILE_LIMIT)
-        throw Error('Library exceeds '+Math.round(RECOVERY_LIMIT/1048576)+' MiB / '+RECOVERY_FILE_LIMIT+' file RAM limit.');
-      // Never let an older file read replace a newer verified write during scanning.
-      if((memoryRecovery.versions.get(path)||0)<=scanVersion)recoveryStore(path,data);
+      if(entry.kind==='directory')await walk(entry,path+'/');
+      else if(entry.kind==='file'&&!isManuscriptReferencePath(path))entries.push({path,entry});
     }
   };
-  try {await walk(root);}catch(error){finished=false;reason=error.message;}
+  const priority=path=>{
+    if(path==='character-archive-manifest.json')return 0;
+    if(path.endsWith('/novel.json')||path.endsWith('/'+SERIES_FILENAME))return 1;
+    if(path.includes('/characters/')&&path.endsWith('.json'))return 2;
+    if(path.endsWith('/timeline.json')||path.endsWith('/character-tree.json'))return 3;
+    if(path.includes('/revisions/')&&path.endsWith('.json'))return 4;
+    if(path.endsWith('.json'))return 5;
+    return 6;
+  };
+  try{
+    await walk(root);
+    entries.sort((a,b)=>priority(a.path)-priority(b.path)||a.path.localeCompare(b.path));
+    for(const {path,entry} of entries){
+      if(scan!==memoryRecovery.scanId||root!==state.root)throw Error('Snapshot interrupted by a library change.');
+      if(count>=RECOVERY_FILE_LIMIT){finished=false;reason='File count exceeds RAM recovery limit; essential files were prioritized.';break;}
+      count++;
+      // Preserve newer verified edits, even when the snapshot scan runs late.
+      if((memoryRecovery.versions.get(path)||0)>scanVersion)continue;
+      const file=await entry.getFile();
+      const previous=memoryRecovery.files.get(path);
+      const nextBytes=memoryRecovery.bytes-(previous?.byteLength||0)+file.size;
+      if(nextBytes>RECOVERY_LIMIT){finished=false;reason='RAM capacity exceeded; some nonessential data is not recoverable.';continue;}
+      // An existing baseline is never silently overwritten by a normal scan.
+      if(previous&&!memoryRecovery.refreshing)continue;
+      recoveryStore(path,new Uint8Array(await file.arrayBuffer()));
+    }
+  }catch(error){finished=false;reason=error.message;}
   if(scan===memoryRecovery.scanId){
     memoryRecovery.complete=finished;
-    memoryRecovery.partialReason=finished?'':reason;
+    memoryRecovery.partialReason=finished?'Imported manuscript copies deliberately excluded.':reason;
     memoryRecovery.scanning=false;
     if(!finished)console.warn('Character Bookshelf recovery snapshot incomplete:',reason);
     renderStorageStatus();
@@ -209,7 +239,7 @@ function storageFailed(error) {
 }
 function renderStorageStatus() {
   const host=$('storageStatusDetails');if(!host)return;
-  const summary=memoryRecovery.scanning?'Building snapshot':memoryRecovery.complete?'Complete':memoryRecovery.active?'Partial':'Unavailable';
+  const summary=memoryRecovery.scanning?'Building snapshot':memoryRecovery.complete?'Complete (except manuscript copies)':memoryRecovery.active?'Partial':'Unavailable';
   const items=[
     ['Original location',memoryRecovery.disconnected?'Unavailable / needs attention':state.root?.name||'Not connected'],
     ['Last verified write',memoryRecovery.lastVerified?formatMoment(memoryRecovery.lastVerified):'Not yet verified'],
@@ -377,7 +407,7 @@ const NAV_KEY = 'character-bookshelf-navigation-v35';
 function pageType() {
   if (!state.root) return 'folder';
   if ($('workspace').classList.contains('hidden')) return 'writers';
-  for (const [id, kind] of [['bookshelfView','bookshelf'],['novelView','characters'],['treeView','tree'],['timelineView','timeline'],['manuscriptView','manuscript'],['librarySearchView','search'],['editor','editor']]) {
+  for (const [id, kind] of [['bookshelfView','bookshelf'],['seriesView','series'],['novelView','characters'],['treeView','tree'],['timelineView','timeline'],['manuscriptView','manuscript'],['librarySearchView','search'],['editor','editor']]) {
     if (!$(id).classList.contains('hidden')) return kind;
   }
   return 'bookshelf';
@@ -443,6 +473,7 @@ async function restoreNavigation(route) {
   if (!route?.writerId || !state.manifest?.writers.some(w => w.id === route.writerId)) return;
   if (route.libraryCreatedAt && state.manifest.createdAt !== route.libraryCreatedAt) return;
   await chooseWriter(route.writerId);
+  if (route.view === 'series') { await showSeries(); return; }
   if (route.view === 'search') { await showLibrarySearch(); return; }
   if (route.view === 'bookshelf') { await showBookshelf(); return; }
   if (!route.novelId || !state.novels.some(n => n.id === route.novelId)) return;
@@ -469,7 +500,7 @@ async function refreshCurrentView() {
   if (!state.root || undoBusy) return;
   const refreshBtn = $('refreshViewBtn');
   refreshBtn.disabled = true;
-  const page = pageType(), writerId = state.writer?.id, novelId = state.novel?.id, characterId = state.active?.id;
+  const page = pageType(), writerId = state.writer?.id, novelId = state.novel?.id, characterId = state.active?.id, seriesId=state.activeSeries;
   const oldScope = pageUndoKey();
   try {
     // This is the IN-APP Refresh View button, not F5. Try saving pending edits
@@ -489,7 +520,7 @@ async function refreshCurrentView() {
       setStage('writer');
     } else if (writerId && manifest.writers.some(w => w.id === writerId)) {
       await chooseWriter(writerId);
-      if (page !== 'bookshelf' && novelId && state.novels.some(n => n.id === novelId)) {
+      if (!['bookshelf','search','series'].includes(page) && novelId && state.novels.some(n => n.id === novelId)) {
         await chooseNovel(novelId);
         if (page === 'manuscript') await showManuscript();
         else if (page === 'tree') await showTree();
@@ -497,12 +528,13 @@ async function refreshCurrentView() {
         else if (page === 'editor' && characterId && state.characters.some(c => c.id === characterId)) await chooseCharacter(characterId);
       }
     } else {
-      state.writer = null; state.writerDir = null; state.novels = []; clearNovelState();
+      state.writer = null; state.writerDir = null; state.novels = [];state.series=[];state.activeSeries=null;invalidateSearchIndex();clearNovelState();
       setStage('writer');
     }
     // A fresh read may have changed the target files; a stale Undo must not overwrite them.
     if (page === 'search') { await showLibrarySearch(); }
-    if (page === 'bookshelf' || page === 'search') {
+    if (page === 'series') {state.activeSeries=seriesId;await showSeries();}
+    if (page === 'bookshelf' || page === 'search' || page === 'series') {
       for (const key of undoByPage.keys()) if (key.includes('/' + writerId + '/')) undoByPage.delete(key);
     } else if (novelId) {
       for (const key of undoByPage.keys()) if (key.includes('/' + novelId + '/')) undoByPage.delete(key);
@@ -563,7 +595,7 @@ async function putFile(directory, filename, content) {
 }
 async function writeHandle(handle, content) {
   const bytes=await contentBytes(content),path=await recoveryPath(handle);
-  const tracked=path!==null&&memoryRecovery.active;
+  const tracked=path!==null&&memoryRecovery.active && !isManuscriptReferencePath(path);
   const baseline=tracked?memoryRecovery.files.get(path):null;
   try {
     // Compare with the original read to avoid overwriting changes made by another
@@ -585,6 +617,7 @@ async function writeHandle(handle, content) {
       recoveryStore(path,verified,++memoryRecovery.writeSerial);
       memoryRecovery.pending.delete(path);
     }
+    if(path && /\.json$/i.test(path))invalidateSearchIndex();
     memoryRecovery.lastVerified=dateNow();memoryRecovery.lastFailure=null;
     memoryRecovery.disconnected=false;renderStorageStatus();
   }catch(error){
@@ -1037,7 +1070,9 @@ async function chooseWriter(id) {
         if (novel.type === 'character-archive-novel') novels.push({ ...novel, folder: folderName });
       } catch (error) { if (error.name !== 'NotFoundError') throw error; }
     }
+    invalidateSearchIndex(); state.series=[];state.activeSeries=null;
     state.writer = writer; state.writerDir = directory; state.novels = novels.sort((a,b) => a.name.localeCompare(b.name));
+    state.series=await loadSeries(directory);
     clearNovelState();
     $('currentWriter').textContent = writer.name;
     $('writerInitial').textContent = writer.name.slice(0,1).toUpperCase();
@@ -1127,7 +1162,7 @@ function blankCharacter(name) {
   const now = dateNow();
   return {
     schema: 1, id: randomId(), name, createdAt: now, updatedAt: now, portraitFile: null,
-    basic: { fullName: name, age: '', occupation: '', appearance: '', notes: '' },
+    basic: { fullName: name, age: '', aliases: '', occupation: '', appearance: '', notes: '' },
     personality: { traits: '', fears: '', beliefs: '', motivations: '', notes: '' },
     background: { history: '', experiences: '', notes: '' },
     relationships: { links: [], notes: '' },
@@ -1175,7 +1210,7 @@ function renderCharacterList() {
 }
 function hideMainViews() {
   if(!$('manuscriptView').classList.contains('hidden'))releaseManuscriptResources();
-  for (const id of ['bookshelfView', 'novelView', 'treeView', 'timelineView', 'librarySearchView', 'manuscriptView', 'emptyView', 'editor']) $(id).classList.add('hidden');
+  for (const id of ['bookshelfView', 'seriesView', 'novelView', 'treeView', 'timelineView', 'librarySearchView', 'manuscriptView', 'emptyView', 'editor']) $(id).classList.add('hidden');
 }
 function cleanGalleryUrls() {
   for (const url of state.galleryUrls) URL.revokeObjectURL(url);
@@ -1220,12 +1255,16 @@ async function showBookshelf() {
     empty.append(el('span', 'bigGlyph','▤'), el('p','', 'Your first book belongs here.'));
     container.append(empty);
   } else {
-    for (let start = 0; start < state.novels.length; start += 5) {
-      const shelf = el('div','bookShelf');
-      const books = el('div','bookShelfRow');
-      state.novels.slice(start, start+5).forEach((novel, offset) => books.append(makeBook(novel,start+offset)));
-      shelf.append(books, el('div','shelfPlank'));
-      container.append(shelf);
+    let i=0;
+    for (const group of renderShelfSeries()){
+      const shelf=el('div','bookShelf');
+      if(group.series){
+        const title=el('button','seriesShelfLabel','◇ '+group.series.name+' · Series');
+        title.type='button';title.onclick=()=>{state.activeSeries=group.series.id;void showSeries();};shelf.append(title);
+      }
+      const books=el('div','bookShelfRow');
+      for(const novel of group.books)books.append(makeBook(novel,i++));
+      shelf.append(books,el('div','shelfPlank'));container.append(shelf);
     }
   }
   setActiveSidebarNavigation('bookshelf');
@@ -1328,6 +1367,7 @@ function setWorkspaceView(view) {
 function setActiveSidebarNavigation(view) {
   $('bookshelfBtn').classList.toggle('navSelected',view==='bookshelf');
   $('novelCharactersBtn').classList.toggle('navSelected',view==='characters');
+  $('seriesNavBtn').classList.toggle('navSelected',view==='series');
 }
 function renderEmpty() {
   hideMainViews(); $('emptyView').classList.remove('hidden');
@@ -1353,7 +1393,7 @@ async function chooseCharacter(id) {
   status('Saved to folder');
 }
 const sections = [
-  { key: 'basic', title: 'Basic Information', fields: [['fullName','Full name'],['age','Age / ages'],['occupation','Occupation'],['appearance','Physical appearance',true]] },
+  { key: 'basic', title: 'Basic Information', fields: [['fullName','Full name'],['age','Age / ages'],['aliases','Aliases & nicknames (comma-separated)',true],['occupation','Occupation'],['appearance','Physical appearance',true]] },
   { key: 'personality', title: 'Personality', fields: [['traits','Personality traits',true],['fears','Fears',true],['beliefs','Beliefs',true],['motivations','Motivations',true]] },
   { key: 'background', title: 'Background', fields: [['history','Personal history',true],['experiences','Significant experiences',true]] },
   { key: 'relationships', title: 'Relationships', fields: [] },
@@ -1647,6 +1687,10 @@ async function deleteBook(id) {
     // Only the selected writer's known novel folder is eligible for deletion.
     await removeTrackedEntry(state.writerDir,novel.folder,{recursive:true});
     state.novels = state.novels.filter(n => n.id !== novel.id);
+    if(seriesForBook(novel.id)){
+      try{await persistSeries(state.series.map(g=>({...g,bookIds:g.bookIds.filter(x=>x!==novel.id)})));}
+      catch(e){toast('Novel deleted, but its series grouping could not be updated. Refresh the library: '+e.message,true);}
+    }
     if (state.novel?.id === novel.id) clearNovelState();
     renderNovelSelect();
     await showBookshelf();
@@ -2508,6 +2552,32 @@ function highlightSearchTarget(match,term){
   if(input){const at=matchWholeWord(input.value,term);if(at>=0){input.focus({preventScroll:true});try{input.setSelectionRange(at,at+term.length);}catch{}}}
   setTimeout(()=>node.classList.remove('searchTarget'),6500);
 }
+/* v4.1: Repeated searches use a volatile in-memory index. Never persist it.
+   Change/version invalidation happens on tracked writes, refresh and writer
+   switches; a periodic rebuild also catches edits from other programs. */
+const SEARCH_INDEX_TTL=90000;
+function invalidateSearchIndex(){state.searchIndex=null;state.searchIndexEpoch++;}
+async function loadSearchIndex(){
+  if(!state.writerDir)return null;
+  const writerId=state.writer?.id,epoch=state.searchIndexEpoch;
+  const cached=state.searchIndex;
+  if(cached?.writerId===writerId && Date.now()-cached.at<SEARCH_INDEX_TTL)return cached;
+  const books=[];
+  for(const novel of state.novels){
+    const dir=await state.writerDir.getDirectoryHandle(novel.folder);
+    const chars=await dir.getDirectoryHandle('characters');
+    const profiles=[];
+    for await(const [name,handle] of chars.entries()){
+      if(handle.kind!=='file'||!name.toLowerCase().endsWith('.json'))continue;
+      profiles.push(await readJSON(handle));
+    }
+    const lookup=new Map(profiles.map(p=>[p.id,p.name]));
+    const events=await loadTimelineEvents(dir);
+    books.push({novel,profiles,lookup,events});
+  }
+  if(writerId!==state.writer?.id||epoch!==state.searchIndexEpoch)return null;
+  const index={writerId,at:Date.now(),books};state.searchIndex=index;return index;
+}
 async function runLibrarySearch(){
   const text=$('globalSearchInput').value.trim();
   const host=$('searchResults');host.replaceChildren();
@@ -2516,21 +2586,15 @@ async function runLibrarySearch(){
   host.append(el('p','muted','Searching character profiles, relationships, books, and timelines…'));
   const matches=[];
   try{
-    for(const novel of state.novels){
-      const dir=await state.writerDir.getDirectoryHandle(novel.folder),chars=await dir.getDirectoryHandle('characters');
-      const profiles=[];
-      for await(const [name,handle] of chars.entries()){
-        if(handle.kind!=='file'||!name.toLowerCase().endsWith('.json'))continue;
-        profiles.push(await readJSON(handle));
-      }
-      const lookup=new Map(profiles.map(p=>[p.id,p.name]));
+    const index=await loadSearchIndex();
+    if(!index || writerId!==state.writer?.id) return;
+    for(const {novel,profiles,lookup,events} of index.books){
       const titleAt=matchWholeWord(novel.name,text);
       if(titleAt>=0)matches.push({kind:'book',novel,match:{label:'Novel title',value:novel.name,priority:0,at:titleAt}});
       for(const profile of profiles){
         const hits=collectSearchableParts(profile,lookup).map(part=>({...part,at:matchWholeWord(part.value,text)})).filter(part=>part.at>=0).sort((a,b)=>a.priority-b.priority);
         if(hits.length)matches.push({kind:'character',novel,profile,match:hits[0]});
       }
-      const events=await loadTimelineEvents(dir);
       for(const event of events){
         const fields=[['Event title',event.title,'title',1],['Event notes',event.notes,'notes',3],['Event date',event.dateText,'dateText',3]];
         for(const [label,value,key,priority] of fields){
@@ -2631,6 +2695,7 @@ function releaseManuscriptResources(){
   if(manuscriptState.pdfUrl){URL.revokeObjectURL(manuscriptState.pdfUrl);manuscriptState.pdfUrl=null;}
   $('manuscriptPdfFrame').removeAttribute('src');
   manuscriptState.loadedFile=null;manuscriptState.chapters=[];manuscriptState.chapterIndex=0;
+  resetMentions();
 }
 function readerPositionKey(){
   return READER_POS_KEY + (state.writer?.id||'writer')+':'+(state.novel?.id||'novel')+':'+(state.novel?.manuscriptFile||'none');
@@ -2697,11 +2762,13 @@ function renderManuscriptParagraphs(paragraphs,restore=true){
     }
     const heading=looksLikeChapter(item);
     const block=el(heading?'h2':'p',heading?'manuscriptChapterTitle':'manuscriptParagraph',content);
+    block.dataset.paragraphIndex=String(i);
     if(heading){block.id='manuscript-chapter-'+chapters.length;
       chapters.push({title:content.trim().slice(0,140),id:block.id});}
     fragment.append(block);
   });
   host.append(fragment);
+  void initializeMentionNavigation(paragraphs);
   if(!chapters.length)chapters.push({title:'Full manuscript',id:null});
   manuscriptState.chapters=chapters;
   for(const [i,ch] of chapters.entries()){
@@ -2791,6 +2858,7 @@ async function showManuscript(){
       $('manuscriptPdfPage').value=String(page);
       $('manuscriptPdfFrame').src=url+'#page='+page;
       $('manuscriptReaderStatus').textContent='PDF rendered by your browser. Use its built-in bookmark and page navigation.';
+      indicatePdfMentionLimit();
     }else{
       const paragraphs=ext==='docx'?await paragraphsFromDOCX(file):paragraphsFromText(await file.text());
       if(request!==manuscriptState.id)return;
@@ -2805,21 +2873,26 @@ async function showManuscript(){
     toast('Manuscript reader: '+error.message,true);
   }
 }
-async function removePriorManuscriptIfUnchanged(filename){
+async function removePriorManuscriptIfUnchanged(filename, expectedChecksum=null){
   const handle=await state.novelDir.getFileHandle(filename);
   const path=await recoveryPath(handle);
   const baseline=path!==null?memoryRecovery.files.get(path):null;
-  if(!baseline){toast('Older manuscript copy retained because its original contents were not in the recovery snapshot.',true);return;}
   const current=new Uint8Array(await (await handle.getFile()).arrayBuffer());
-  if(!sameBytes(current,baseline)){toast('Older manuscript copy was changed outside Character Bookshelf and was kept for safety.',true);return;}
+  const matched=expectedChecksum ? await manuscriptChecksum(current)===expectedChecksum : !!baseline&&sameBytes(current,baseline);
+  if(!matched){toast('Old manuscript copy kept for safety because no matching original checksum is available.',true);return;}
   await removeTrackedEntry(state.novelDir,filename);
+}
+async function manuscriptChecksum(bytes){
+  if(!crypto?.subtle)throw Error('Secure browser cryptography is needed to verify manuscript copies.');
+  const digest=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
+  return [...digest].map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 async function importManuscript(evt){
   const file=evt.target.files?.[0];evt.target.value='';if(!file || !state.novel || !state.novelDir)return;
   const name=file.name||'manuscript';const ext=name.split('.').pop().toLowerCase();
   if(!['docx','pdf','txt'].includes(ext)){toast('Use a DOCX, PDF, or TXT manuscript.',true);return;}
   if(file.size===0||file.size>MANUSCRIPT_MAX_BYTES){toast('Choose a nonempty manuscript no larger than 64 MiB.',true);return;}
-  const previous=state.novel.manuscriptFile||null;
+  const previous=state.novel.manuscriptFile||null, previousChecksum=state.novel.manuscriptChecksum||null;
   if(previous&&!confirm('Replace the imported manuscript reference copy for '+state.novel.name+'? Your working source document will not be changed.'))return;
   let created=null;
   try{
@@ -2835,16 +2908,18 @@ async function importManuscript(evt){
     const timestamp=Date.now().toString(36),identifier=randomId().slice(0,8);
     created='manuscript-'+timestamp+'-'+identifier+'.'+ext;
     $('manuscriptReaderStatus').textContent='Saving manuscript copy…';
-    await putFile(state.novelDir,created,new Uint8Array(await file.arrayBuffer()));
+    const manuscriptBytes=new Uint8Array(await file.arrayBuffer());
+    const checksum=await manuscriptChecksum(manuscriptBytes);
+    await putFile(state.novelDir,created,manuscriptBytes);
     // Store metadata only after the new file has passed read-back verification.
-    const updated={...state.novel,manuscriptFile:created,manuscriptOriginalName:name,manuscriptImportedAt:dateNow()};
+    const updated={...state.novel,manuscriptFile:created,manuscriptOriginalName:name,manuscriptChecksum:checksum,manuscriptImportedAt:dateNow()};
     delete updated.folder;
     await putJSON(state.novelDir,'novel.json',updated);
-    state.novel.manuscriptFile=created;state.novel.manuscriptOriginalName=name;state.novel.manuscriptImportedAt=updated.manuscriptImportedAt;
+    state.novel.manuscriptFile=created;state.novel.manuscriptOriginalName=name;state.novel.manuscriptChecksum=checksum;state.novel.manuscriptImportedAt=updated.manuscriptImportedAt;
     const entry=state.novels.find(n=>n.id===state.novel.id);
-    if(entry)Object.assign(entry,{manuscriptFile:created,manuscriptOriginalName:name,manuscriptImportedAt:updated.manuscriptImportedAt});
+    if(entry)Object.assign(entry,{manuscriptFile:created,manuscriptOriginalName:name,manuscriptChecksum:checksum,manuscriptImportedAt:updated.manuscriptImportedAt});
     if(previous&&previous!==created){
-      try{await removePriorManuscriptIfUnchanged(previous);}catch(e){toast('Updated manuscript saved, but the previous copy could not be removed. '+e.message,true);}
+      try{await removePriorManuscriptIfUnchanged(previous,previousChecksum);}catch(e){toast('Updated manuscript saved, but the previous copy could not be removed. '+e.message,true);}
     }
     toast('Read-only manuscript copy imported. The original file was not changed.');
     await showManuscript();
@@ -2864,17 +2939,17 @@ async function importManuscript(evt){
 }
 async function removeManuscript(){
   if(!state.novel?.manuscriptFile || !confirm('Remove this novel’s imported manuscript copy? Your original working document will not be touched.'))return;
-  const previous=state.novel.manuscriptFile;
+  const previous=state.novel.manuscriptFile,previousChecksum=state.novel.manuscriptChecksum||null;
   try{
     if(!(await flush()))throw Error('Save pending changes first.');
     const updated={...state.novel};delete updated.folder;
-    delete updated.manuscriptFile;delete updated.manuscriptOriginalName;delete updated.manuscriptImportedAt;
+    delete updated.manuscriptFile;delete updated.manuscriptOriginalName;delete updated.manuscriptChecksum;delete updated.manuscriptImportedAt;
     await putJSON(state.novelDir,'novel.json',updated);
-    for(const field of ['manuscriptFile','manuscriptOriginalName','manuscriptImportedAt']){
+    for(const field of ['manuscriptFile','manuscriptOriginalName','manuscriptChecksum','manuscriptImportedAt']){
       delete state.novel[field];
       const record=state.novels.find(n=>n.id===state.novel.id);if(record)delete record[field];
     }
-    try{await removePriorManuscriptIfUnchanged(previous);}catch(error){toast('Reference removed, but the old file remains on the drive: '+error.message,true);}
+    try{await removePriorManuscriptIfUnchanged(previous,previousChecksum);}catch(error){toast('Reference removed, but the old file remains on the drive: '+error.message,true);}
     releaseManuscriptResources();await showManuscript();
     toast('Imported manuscript removed. Your source document was not affected.');
   }catch(error){toast('Could not remove imported manuscript: '+error.message,true);}
@@ -3138,7 +3213,7 @@ async function exportDocx(scope) {
 let pendingImport = null;
 const IMPORT_MAX_BYTES = 1024 * 1024;
 const IMPORT_FIELDS = [
-  ['basic','Basic Information', [['fullName','Full name'],['age','Age / ages'],['occupation','Occupation'],['appearance','Physical appearance'],['notes','Additional notes']]],
+  ['basic','Basic Information', [['fullName','Full name'],['age','Age / ages'],['aliases','Aliases & nicknames (comma-separated)',true],['occupation','Occupation'],['appearance','Physical appearance'],['notes','Additional notes']]],
   ['personality','Personality', [['traits','Personality traits'],['fears','Fears'],['beliefs','Beliefs'],['motivations','Motivations'],['notes','Additional notes']]],
   ['background','Background', [['history','Personal history'],['experiences','Significant experiences'],['notes','Additional notes']]],
   ['relationships','Relationships', [['notes','Relationship notes']]],
@@ -3415,8 +3490,21 @@ function initImportTools(){
   }
 }
 
+function openTutorial(){
+  const dialog=$('tutorialDialog');
+  if(!dialog.open)dialog.showModal();
+}
+function popOutTutorial(){
+  const win=window.open('tutorial.html','characterBookshelfTutorial','width=1100,height=780,resizable=yes,scrollbars=yes');
+  if(win){win.focus();$('tutorialDialog').close();}
+  else toast('Pop-up blocked. Allow pop-ups for this site or use the tutorial in this window.',true);
+}
 function init() {
   $('footerVersion').textContent='v'+APP_VERSION;
+  $('gettingStartedBtn').onclick=openTutorial;
+  $('footerTutorialBtn').onclick=openTutorial;
+  $('tutorialCloseBtn').onclick=()=>$('tutorialDialog').close();
+  $('tutorialPopBtn').onclick=popOutTutorial;
   renderReleaseHistory();
   $('releaseNotesBtn').onclick=()=>$('releaseHistoryDialog').showModal();
   $('closeReleaseHistoryBtn').onclick=()=>$('releaseHistoryDialog').close();
@@ -3427,6 +3515,10 @@ function init() {
   $('undoBtn').onclick=()=>void undoLast();updateUndoButton();
   $('refreshViewBtn').onclick=()=>void refreshCurrentView();
   $('globalSearchBtn').onclick=()=>void showLibrarySearch();
+  $('seriesNavBtn').onclick=()=>void showSeries();
+  $('bookshelfSeriesBtn').onclick=()=>void showSeries();
+  $('seriesBackShelfBtn').onclick=()=>void showBookshelf();
+  $('newSeriesBtn').onclick=()=>void createSeries();
   $('searchShelfBtn').onclick=()=>void showBookshelf();
   $('runSearchBtn').onclick=()=>void runLibrarySearch();
   $('globalSearchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();void runLibrarySearch();}});
@@ -3454,6 +3546,8 @@ function init() {
   $('manuscriptPdfGo').onclick=()=>jumpPdfPage();
   $('manuscriptPdfOpen').onclick=()=>{if(manuscriptState.pdfUrl)window.open(manuscriptState.pdfUrl,'_blank','noopener,noreferrer');};
   $('manuscriptText').addEventListener('scroll',onManuscriptScroll,{passive:true});
+  $('manuscriptPrevMatch').onclick=()=>jumpToManuscriptMention(mentionState.currentPosition-1);
+  $('manuscriptNextMatch').onclick=()=>jumpToManuscriptMention(mentionState.currentPosition+1);
 
   $('treeTimelineBtn').onclick=()=>void showTimeline();
   $('editorTimelineBtn').onclick=()=>void showTimeline();
@@ -3478,7 +3572,7 @@ function init() {
   $('openRecoveredLibraryBtn').onclick=()=>void openRecoveredLibrary();
   const switchWriter = async () => {
     if (!(await flush())) return;
-    state.writer = null; state.writerDir = null; state.novels = []; clearNovelState();
+    state.writer = null; state.writerDir = null; state.novels = [];state.series=[];state.activeSeries=null;invalidateSearchIndex();clearNovelState();
     renderWriterCards(); setStage('writer'); status('Choose writer');
   };
   $('switchWriterBtn').onclick = switchWriter;

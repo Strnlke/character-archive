@@ -5,8 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1018">
   <title>Character Bookshelf</title>
-  <link rel="stylesheet" href="styles.css?v=4.0.2">
-  <script src="app.js?v=4.0.2" defer></script>
+  <link rel="stylesheet" href="styles.css?v=4.1">
+  <script src="app.js?v=4.1" defer></script>
+  <script src="series-v41.js?v=4.1" defer></script>
+  <script src="manuscript-v41.js?v=4.1" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -56,6 +58,7 @@
       <p>Library folder: <strong id="folderName"></strong></p>
       <div class="writergrid" id="writerGrid"></div>
       <button id="newWriterBtn" type="button" class="quiet wide">＋ Create writer profile</button>
+      <button id="gettingStartedBtn" type="button" class="textButton">▤ Getting Started Tutorial</button>
       <p class="helper">Writer profiles organize files; they are not password-protected accounts.</p>
       <button id="reselectFolderBtn" type="button" class="textButton">Choose a different folder</button>
     </div>
@@ -91,6 +94,7 @@
         <div class="eyebrow">WRITER</div>
         <div class="writerHeading"><span class="writerAvatar" id="writerInitial">A</span><strong id="currentWriter">Writer</strong></div>
         <button id="bookshelfBtn" class="sideButton bookshelfNav" type="button">▤ My bookshelf</button>
+        <button id="seriesNavBtn" class="sideButton" type="button">◇ Series</button>
         <button id="switchWriterBtn" class="sideButton" type="button">⇄ Switch writer</button>
       </div>
       <div class="sidebarBlock">
@@ -116,10 +120,16 @@
             <h1 id="shelfTitle">Your Bookshelf</h1>
             <p id="shelfSubtitle">Your novels, characters, and stories in one place.</p>
           </div>
-          <button id="bookshelfNewNovelBtn" class="primary" type="button">＋ New novel</button>
+          <div class="shelfActionGroup"><button id="bookshelfSeriesBtn" class="quiet" type="button">◇ Series</button><button id="bookshelfNewNovelBtn" class="primary" type="button">＋ New novel</button></div>
         </div>
         <section class="recentBox" aria-labelledby="recentHeading"><div class="recentHeading"><h2 id="recentHeading">Recently worked on</h2><span class="muted">Your latest saved characters</span></div><div id="recentCharacters" class="recentGrid"><p class="muted">Loading recent characters…</p></div></section><div id="shelfBooks" class="shelfBooks"></div>
         <div class="shelfHelp">Select a book to open its character collection. Your work remains in the folder you selected.</div>
+      </section>
+      <section id="seriesView" class="seriesView hidden" aria-labelledby="seriesTitle">
+        <nav class="profileNav"><button type="button" id="seriesBackShelfBtn" class="textButton">Bookshelf</button><span class="navSep">/</span><span class="navNow" aria-current="page">Series</span></nav>
+        <div class="seriesHeading"><div><p class="pageKicker">CONNECTED BOOKS · ONE WRITER</p><h1 id="seriesTitle">Novel Series</h1><p class="muted">Group books, copy characters independently, and view their combined timelines.</p></div><button id="newSeriesBtn" type="button" class="primary">＋ New series</button></div>
+        <nav id="seriesList" class="seriesList" aria-label="Choose a series"></nav>
+        <div id="seriesDetails" class="seriesDetails"></div>
       </section>
       <section id="novelView" class="novelView hidden" aria-labelledby="novelViewTitle">
         <button id="novelBackToShelfBtn" class="textButton pageBack" type="button">← Back to bookshelf</button>
@@ -183,11 +193,20 @@
         <div id="manuscriptEmpty" class="manuscriptEmpty"><div class="bigGlyph">▤</div><h2>No manuscript imported</h2><p>Import a DOCX, PDF, or TXT file to read a separate copy within this novel. Your original remains unchanged.</p><label class="primary fileLabel" for="manuscriptFileInput">↑ Import manuscript</label></div>
         <div id="manuscriptReady" class="manuscriptReady hidden">
           <div class="manuscriptFileInfo"><div><strong id="manuscriptFileName"></strong><span id="manuscriptFileDetails" class="muted"></span></div><span class="readOnlyPill">◈ Read only</span></div>
+          <div class="manuscriptReaderShell"><div class="manuscriptMain">
           <div id="manuscriptTextLayout" class="manuscriptTextLayout">
             <aside class="manuscriptChapters"><div class="readerAsideHeading">CONTENTS</div><div id="manuscriptChapters"></div></aside>
             <div class="readingWorkspace"><div class="readingToolbar"><span id="manuscriptChapterIndicator">Reading view</span><div class="readerTextControls"><button id="readerSmallerBtn" type="button" class="quiet" aria-label="Decrease font size">A−</button><button id="readerLargerBtn" type="button" class="quiet" aria-label="Increase font size">A+</button></div></div><div id="manuscriptText" class="manuscriptText" tabindex="0" aria-label="Read-only manuscript text"></div></div>
           </div>
           <div id="manuscriptPdfLayout" class="manuscriptPdfLayout hidden"><div class="readingToolbar"><span>PDF · Original page layout</span><div class="readerPageControls"><label>Page <input id="manuscriptPdfPage" type="number" min="1" value="1" aria-label="PDF page number"></label><button id="manuscriptPdfGo" type="button" class="quiet">Go</button><button id="manuscriptPdfOpen" type="button" class="quiet">Open in new tab</button></div></div><iframe id="manuscriptPdfFrame" title="Read-only PDF manuscript viewer"></iframe><p class="helper">Use the PDF viewer's built-in page and bookmark controls where available.</p></div>
+          </div>
+          <aside id="manuscriptMentionsPanel" class="manuscriptMentionsPanel" aria-label="Character mentions">
+            <div class="readerAsideHeading">CHARACTERS IN THIS NOVEL</div>
+            <p id="manuscriptMentionsIntro" class="muted">Select a character to find manuscript mentions.</p>
+            <div id="manuscriptCharacterList" class="manuscriptCharacterList"></div>
+            <div class="manuscriptMatchesHeading"><strong id="manuscriptMatchCounter">Select a character</strong><div><button id="manuscriptPrevMatch" type="button" class="quiet" disabled aria-label="Previous mention">↑</button><button id="manuscriptNextMatch" type="button" class="quiet" disabled aria-label="Next mention">↓</button></div></div>
+            <div id="manuscriptMentionList" class="manuscriptMentionList"></div>
+          </aside></div>
           <div id="manuscriptReaderStatus" class="readerStatus" role="status"></div>
         </div>
       </section>
@@ -322,7 +341,7 @@
   <dialog id="storageStatusDialog" class="backupDialog" aria-labelledby="storageStatusHeading">
     <div class="dialogBody">
       <h2 id="storageStatusHeading">Storage &amp; recovery status</h2>
-      <p class="helper">This memory snapshot exists only while this browser page is open. Browser refresh (F5), closing the tab, or a crash destroys it.</p>
+      <p class="helper">The recovery snapshot exists only while this tab is open; browser reload or closing destroys it. Imported manuscript copies are excluded from RAM recovery; they remain in regular writer ZIP backups. Keep your original manuscripts.</p>
       <div id="storageStatusDetails" class="storageStatusDetails"></div>
       <div class="backupReminderRow"><label for="backupReminderDays">Remind me to export a writer ZIP</label>
         <select id="backupReminderDays"><option value="0">Never</option><option value="1">Every day</option><option value="7">Every 7 days</option><option value="14">Every 14 days</option><option value="30">Every 30 days</option></select></div>
@@ -334,7 +353,7 @@
   <dialog id="recoveryDialog" class="backupDialog" aria-labelledby="recoveryHeading">
     <div class="dialogBody"><h2 id="recoveryHeading">Storage recovery</h2>
       <p id="recoveryReason" class="errorText"></p>
-      <p class="helper">Emergency Save copies available files from this tab's memory into a NEW recovery folder. It does not overwrite or reconnect the original library. If a full snapshot is unavailable, only the current writer's recoverable files are copied.</p>
+      <p class="helper">Emergency Save copies available files from this tab's memory into a NEW recovery folder. It does not overwrite or reconnect the original library. If a full snapshot is unavailable, only the current writer's recoverable files are copied. Imported manuscript copies are never included in RAM recovery; re-import originals or use a regular writer ZIP backup.</p>
       <p class="helper">Do not reload the browser until the recovery is saved somewhere safe. An incomplete recovery is not a backup.</p>
       <p id="recoverySaveStatus" role="status" class="recoverySaveStatus"></p>
       <div class="dialogActions recoveryActions">
@@ -350,8 +369,12 @@
   <dialog id="revisionHistoryDialog" class="revisionHistoryDialog" aria-labelledby="revisionHistoryHeading"><div class="dialogBody"><h2 id="revisionHistoryHeading">Character Revision History</h2><p class="helper">Saved snapshots from earlier editing sessions. Restoring a revision first backs up your current profile.</p><div id="revisionHistoryList" class="revisionHistoryList"></div><div class="dialogActions"><button id="closeRevisionsBtn" type="button" class="quiet">Close</button></div></div></dialog>
   <footer class="appFooter" id="appFooter">
     <div class="footerBrand"><span class="footerSymbol" aria-hidden="true">✦</span> Character Bookshelf</div>
-    <div class="footerLinks"><button id="footerStorageBtn" type="button" class="footerLink">Storage status</button><button id="releaseNotesBtn" type="button" class="footerLink">Release notes</button><span id="footerVersion" class="footerVersion">v4.0.2</span></div>
+    <div class="footerLinks"><button id="footerStorageBtn" type="button" class="footerLink">Storage status</button><button id="releaseNotesBtn" type="button" class="footerLink">Release notes</button><button id="footerTutorialBtn" type="button" class="footerLink">Tutorial</button><span id="footerVersion" class="footerVersion">v4.1</span></div>
   </footer>
+  <dialog id="tutorialDialog" class="tutorialDialog" aria-labelledby="tutorialDialogTitle">
+    <div class="tutorialDialogBar"><strong id="tutorialDialogTitle">Getting Started · Character Bookshelf</strong><div><button id="tutorialPopBtn" type="button" class="quiet">↗ Pop out</button><button id="tutorialCloseBtn" type="button" class="primary">Close</button></div></div>
+    <iframe id="tutorialFrame" title="Character Bookshelf illustrated tutorial" loading="lazy" src="tutorial.html"></iframe>
+  </dialog>
   <dialog id="releaseHistoryDialog" class="releaseHistoryDialog" aria-labelledby="releaseHistoryTitle"><div class="dialogBody"><div class="releaseHistoryHeading"><div><p class="pageKicker">APPLICATION HISTORY</p><h2 id="releaseHistoryTitle">Release notes</h2></div><button id="closeReleaseHistoryBtn" type="button" class="quiet">Close</button></div><p class="helper">The evolution of Character Bookshelf, beginning with its first working USB release.</p><div id="releaseHistoryList" class="releaseHistoryList"></div></div></dialog>
   <div id="toast" class="toast hidden" role="alert"></div>
 </body>
