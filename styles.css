@@ -102,9 +102,9 @@
 .treeNodeOpen{font-weight:750;font-size:15px;line-height:1.2;text-align:left;border:0;background:none;color:#ecf3ff;overflow-wrap:anywhere;padding:3px 2px}
 .treeNodeOpen:hover{text-decoration:underline;color:#b6d5ff}
 .treeNodeCaption{font-size:11px;color:#8fa9c2;margin:0 2px}
-.treeEdge{fill:none;stroke:#78a9d9;stroke-width:2.2;opacity:.85}
-.treeEdgeOther{stroke:#8b94aa;stroke-dasharray:7 6;opacity:.65}
-.treeEdgeLabel{fill:#bdd4ed;font-size:11px;font-weight:700;paint-order:stroke;stroke:#101c2b;stroke-width:6px;stroke-linejoin:round}
+.treeEdge{fill:none;stroke-width:2.2;opacity:.85}
+.treeEdgeOther{stroke-dasharray:7 6;opacity:.65}
+.treeEdgeLabel{font-size:11px;font-weight:700;paint-order:stroke;stroke:#101c2b;stroke-width:6px;stroke-linejoin:round}
 .treeEditPanel{background:#142233;border:1px solid #2d4059;border-radius:13px;margin-top:22px;padding:20px}
 .treeEditTitle h2{margin:0 0 5px;font-size:18px}
 .treeEditTitle p{margin:0 0 15px;color:#a0b2c8;font-size:13px}
@@ -132,11 +132,11 @@
 .undoTopButton{background:#1e344c;border:1px solid #6284a8;color:#e6f1fe;border-radius:8px;padding:9px 13px;font-weight:750;white-space:nowrap}
 .undoTopButton:not(:disabled):hover{background:#2c4b6e}
 .undoTopButton:disabled{opacity:.40;cursor:not-allowed}
-.treeEdgeGlow{fill:none;stroke:#2f80c6;stroke-width:7;opacity:.27;stroke-linecap:round;stroke-linejoin:round}
-.treeEdge{fill:none;stroke:#a9d6ff;stroke-width:3.25;opacity:1;stroke-linecap:round;stroke-linejoin:round}
-.treeEdgeOther{stroke:#d4c5a9;stroke-dasharray:9 6;opacity:.92}
-.treeEdgeLabelBacking{fill:#132237;stroke:#4c6f94;stroke-width:1}
-.treeEdgeLabel{fill:#f0f8ff;font-size:12px;font-weight:800;paint-order:normal;stroke:none}
+.treeEdgeGlow{fill:none;stroke-width:7;opacity:.27;stroke-linecap:round;stroke-linejoin:round}
+.treeEdge{fill:none;stroke-width:3.25;opacity:1;stroke-linecap:round;stroke-linejoin:round}
+.treeEdgeOther{stroke-dasharray:9 6;opacity:.92}
+.treeEdgeLabelBacking{fill:#132237;stroke-width:1}
+.treeEdgeLabel{font-size:12px;font-weight:800;paint-order:normal;stroke:none}
 .treeNode.linkTarget{border-color:#b9eeb5;box-shadow:0 0 0 3px #97d99a55,0 10px 25px #03070e80}
 .treeConnectForm{grid-template-columns:minmax(160px,1fr) minmax(220px,1.8fr) minmax(160px,1fr) auto}
 .treeTargetsField{padding:0;margin:0;border:0;min-width:0}

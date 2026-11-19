@@ -1,3 +1,13 @@
+## v4.0.2 hotfix — Relationship Tree Colors
+
+The v4.0.1 tree renderer assigned each relationship a distinct muted color, but older CSS `stroke`/`fill` declarations overrode those assigned colors. This update removes the conflicting rules for the relationship lines, their glow, label text, and label borders. It does not alter any saved character files or change the manuscript reader.
+
+**Install:** Replace `index.html`, `app.js`, and `styles.css` together in the GitHub Pages repository, commit, and reload the site after deployment (when no edits are pending). The HTML cache-busting query is updated to `4.0.2`. Your USB library does not need any migration.
+
+**Test:** Open Test Novel → Character Tree. Confirm that Spouse/partner, Sibling, Dating/romantic partner, and Ex-spouse appear in subtly different colors; the legend should match each connection. Check a PNG export to ensure its colors remain correct.
+
+**Verification:** Tested CSS/SVG rendering under local Chromium. Deployment on the live GitHub Pages site and actual USB remain to be checked.
+
 ## v4.0.1 hotfix
 
 The v4.0 sticky navigation did not remain pinned in the user's deployed browser. v4.0.1 uses a fixed top bar with its actual height measured by a `ResizeObserver` so it stays on screen and does not hide page content, including after toolbar buttons wrap. This is a **navigation hotfix only**; existing v4.0 manuscript and library features are unchanged.

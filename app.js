@@ -62,9 +62,10 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.0.1';
+const APP_VERSION = '4.0.2';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
+  ['4.0.2','Relationship Color Hotfix',['Fixed an older CSS rule overriding relationship-specific tree line, label, and border colors','Preserved existing tree layout, links, exports, and library data']],
   ['4.0.1','Pinned Navigation Hotfix',['Top navigation remains visible while scrolling, including on narrower screens','Header height is measured automatically to prevent page content from being obscured','Updated stylesheet and script references to avoid using older cached assets']],
   ['4.0','Visual & Manuscript Reading',['Sticky navigation and clearer active-page indicators','Subtle, distinct relationship colors and a collapsible legend','Read-only DOCX, PDF and TXT reader with novel and bookshelf entry points','Version footer with complete release history','Responsive navigation and layout refinements']],
   ['3.9','Storage Reliability & Recovery',['Writer deletion safeguards and simplified writer creation','Verified writes and file conflict detection','RAM snapshots, recovery to another folder, and recovery reports','Storage status and backup reminders']],

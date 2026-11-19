@@ -1,3 +1,8 @@
+## v4.0.2 — Relationship Color Hotfix
+
+- Corrected CSS overrides that caused all relationship tree connections to display the same light blue instead of their configured muted colors.
+- Updated label and connection border colors while preserving existing links, saved positions, and exports.
+
 # Character Bookshelf — Release History
 
 This is an archival summary of the release notes built into Character Bookshelf v4.0. Entries are based on the retained development releases, not the unfinished OneDrive-era prototype. Precise historical release dates are omitted where unverified.
