@@ -1,4 +1,14 @@
-# Character Bookshelf v4.0 — Visual Refresh & Manuscript Reader
+## v4.0.1 hotfix
+
+The v4.0 sticky navigation did not remain pinned in the user's deployed browser. v4.0.1 uses a fixed top bar with its actual height measured by a `ResizeObserver` so it stays on screen and does not hide page content, including after toolbar buttons wrap. This is a **navigation hotfix only**; existing v4.0 manuscript and library features are unchanged.
+
+**Install:** Commit **all three** files (`index.html`, `styles.css`, `app.js`) from this release to your GitHub Pages repository, replacing the corresponding v4.0 files. The `index.html` asset references now include `?v=4.0.1` so the browser requests the updated stylesheet and application script. After deployment, refresh the page when no edits are pending, select the USB library as usual, and confirm that scrolling leaves the toolbar visible. If you need to roll back, use the original v4.0 release snapshot.
+
+**Testing:** The top bar remained pinned in simulated Chromium scrolling tests at 1366px, 800px, 600px, and 390px viewport widths, with no content overlap at the top of the page. This has **not** yet been tested against the user's live website or physical USB library.
+
+---
+
+# Character Bookshelf v4.0.1 — Sticky Navigation Hotfix
 
 **Upgrade from v3.9.** This release keeps the existing manually selected USB/library-folder storage model, writer profiles, per-character JSON files, backups, import review, revision history, timelines, and v3.9 emergency recovery. It does not upload the library to a server. No change to the existing character profile schema is required.
 

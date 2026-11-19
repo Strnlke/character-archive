@@ -441,3 +441,21 @@ body[data-active-view="characters"] #novelCharactersBtn,body[data-active-view="b
   .topactions>*{flex:none}
   .topactions .status{width:auto;white-space:nowrap}
 }
+
+/* v4.0.1 — Reliable fixed toolbar. The CSS sticky toolbar could scroll out of
+   view in some page/deployment layouts. A measured fixed toolbar stays
+   visible during the entire document scroll, even when its height changes. */
+:root{--bookshelf-topbar-height:74px}
+body{padding-top:var(--bookshelf-topbar-height)}
+.topbar{position:fixed;top:0;left:0;right:0;width:100%;z-index:60}
+html{scroll-padding-top:calc(var(--bookshelf-topbar-height) + 20px)}
+.section,.manuscriptView,.profileNav,.treeBreadcrumb,.timelineView,.librarySearchView{
+  scroll-margin-top:calc(var(--bookshelf-topbar-height) + 20px);
+}
+.workspace.editorMode .sidebar{top:var(--bookshelf-topbar-height);height:calc(100vh - var(--bookshelf-topbar-height))}
+@media(max-width:750px){
+ html{scroll-padding-top:calc(var(--bookshelf-topbar-height) + 16px)}
+ .section,.manuscriptView,.profileNav,.treeBreadcrumb,.timelineView,.librarySearchView{
+   scroll-margin-top:calc(var(--bookshelf-topbar-height) + 16px);
+ }
+}

@@ -2,6 +2,12 @@
 
 This is an archival summary of the release notes built into Character Bookshelf v4.0. Entries are based on the retained development releases, not the unfinished OneDrive-era prototype. Precise historical release dates are omitted where unverified.
 
+## v4.0.1 — Pinned Navigation Hotfix
+
+- Fixed top toolbar positioning during page scrolling at desktop and mobile widths
+- Reserved space automatically for the toolbar to avoid covering content
+- Refreshed asset URLs to avoid stale stylesheet and script caches
+
 ## v4.0 — Visual & Manuscript Reading
 
 - Sticky navigation and clearer active-page indicators
