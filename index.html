@@ -123,7 +123,7 @@
             <button id="novelViewNewCharacterBtn" class="primary" type="button">＋ New character</button>
           </div>
         </div>
-        <div class="collectionHeading"><h2>Characters</h2><label class="gallerySortLabel" for="gallerySort">Sort <select id="gallerySort"><option value="name">Name (A–Z)</option><option value="newest">Recently created</option><option value="updated">Recently updated</option></select></label><button id="novelTreeBtn" class="treeNavButton" type="button">♧ Character tree</button><button id="novelTimelineBtn" class="treeNavButton" type="button">▦ Timeline</button><span id="novelCharacterCount" class="count">0</span><div class="spacer"></div><button id="exportPdfNovelBtn" class="quiet" type="button">↓ Export PDF</button><button id="exportDocxNovelBtn" class="quiet" type="button">↓ Export Word</button></div>
+        <div class="collectionHeading"><h2>Characters</h2><label class="gallerySortLabel" for="gallerySort">Sort <select id="gallerySort"><option value="name">Name (A–Z)</option><option value="newest">Recently created</option><option value="updated">Recently updated</option></select></label><button id="novelTreeBtn" class="treeNavButton" type="button">♧ Character tree</button><button id="novelTimelineBtn" class="treeNavButton" type="button">▦ Timeline</button><button id="novelManuscriptBtn" class="treeNavButton" type="button">▤ Manuscript</button><span id="novelCharacterCount" class="count">0</span><div class="spacer"></div><button id="exportPdfNovelBtn" class="quiet" type="button">↓ Export PDF</button><button id="exportDocxNovelBtn" class="quiet" type="button">↓ Export Word</button></div>
         <div id="characterGallery" class="characterGallery"></div>
       </section>
       <section id="treeView" class="treeView hidden" aria-labelledby="treeViewTitle">
@@ -142,6 +142,7 @@
         <div id="treeViewport" class="treeViewport" tabindex="0" aria-label="Scrollable character relationship tree">
           <div id="treeStage" class="treeStage"><svg id="treeLines" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg><div id="treeNodes"></div></div>
         </div>
+        <details id="treeLegend" class="treeLegend"><summary>Relationship color legend <span class="legendHint">Show all relationship types</span></summary><div id="treeLegendItems" class="treeLegendItems"></div></details>
         <div class="treeEditPanel">
           <div class="treeEditTitle"><div><h2>Edit connections</h2><p>Connections from the character profiles appear automatically. Set what they mean here, or add and remove connections.</p></div></div>
           <div id="treeConnectionList" class="treeConnectionList"></div>
@@ -160,6 +161,20 @@
         <div class="timelineToolbar"><div class="timelineModes"><button id="timelineAllMode" type="button" class="timelineMode selected">All Characters</button><button id="timelineCharacterMode" type="button" class="timelineMode">By Character</button></div><label id="timelineFilterWrap" class="hidden">Character <select id="timelineCharacterFilter"></select></label><span id="timelineEventCount" class="count"></span></div>
         <div id="timelineEntries" class="timelineEntries"></div>
         <p class="timelineTip">Date is optional. Events with known years are grouped chronologically; within a year, use the arrows to change the order. Relative or undated events are kept in a separate group. No story events are generated from freeform notes automatically.</p>
+      </section>
+      <section id="manuscriptView" class="manuscriptView hidden" aria-labelledby="manuscriptTitle">
+        <nav class="profileNav" aria-label="Manuscript navigation"><button id="manuscriptShelfBtn" class="textButton" type="button">Bookshelf</button><span class="navSep">/</span><button id="manuscriptNovelBtn" class="textButton" type="button">All characters</button><span class="navSep">/</span><span class="navNow" aria-current="page">Manuscript</span></nav>
+        <div class="manuscriptHeading"><div><p class="pageKicker">NOVEL REFERENCE · READ ONLY</p><h1 id="manuscriptTitle">Manuscript</h1><p id="manuscriptDescription" class="muted">Read an imported copy. Your working draft stays untouched.</p></div><div class="manuscriptActions"><label class="quiet fileLabel" for="manuscriptFileInput" id="manuscriptImportLabel">↑ Import manuscript</label><input id="manuscriptFileInput" type="file" accept=".docx,.pdf,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden><button id="manuscriptRemoveBtn" type="button" class="dangerOutline hidden">Remove copy</button></div></div>
+        <div id="manuscriptEmpty" class="manuscriptEmpty"><div class="bigGlyph">▤</div><h2>No manuscript imported</h2><p>Import a DOCX, PDF, or TXT file to read a separate copy within this novel. Your original remains unchanged.</p><label class="primary fileLabel" for="manuscriptFileInput">↑ Import manuscript</label></div>
+        <div id="manuscriptReady" class="manuscriptReady hidden">
+          <div class="manuscriptFileInfo"><div><strong id="manuscriptFileName"></strong><span id="manuscriptFileDetails" class="muted"></span></div><span class="readOnlyPill">◈ Read only</span></div>
+          <div id="manuscriptTextLayout" class="manuscriptTextLayout">
+            <aside class="manuscriptChapters"><div class="readerAsideHeading">CONTENTS</div><div id="manuscriptChapters"></div></aside>
+            <div class="readingWorkspace"><div class="readingToolbar"><span id="manuscriptChapterIndicator">Reading view</span><div class="readerTextControls"><button id="readerSmallerBtn" type="button" class="quiet" aria-label="Decrease font size">A−</button><button id="readerLargerBtn" type="button" class="quiet" aria-label="Increase font size">A+</button></div></div><div id="manuscriptText" class="manuscriptText" tabindex="0" aria-label="Read-only manuscript text"></div></div>
+          </div>
+          <div id="manuscriptPdfLayout" class="manuscriptPdfLayout hidden"><div class="readingToolbar"><span>PDF · Original page layout</span><div class="readerPageControls"><label>Page <input id="manuscriptPdfPage" type="number" min="1" value="1" aria-label="PDF page number"></label><button id="manuscriptPdfGo" type="button" class="quiet">Go</button><button id="manuscriptPdfOpen" type="button" class="quiet">Open in new tab</button></div></div><iframe id="manuscriptPdfFrame" title="Read-only PDF manuscript viewer"></iframe><p class="helper">Use the PDF viewer's built-in page and bookmark controls where available.</p></div>
+          <div id="manuscriptReaderStatus" class="readerStatus" role="status"></div>
+        </div>
       </section>
       <section id="librarySearchView" class="librarySearchView hidden" aria-labelledby="librarySearchTitle">
         <div class="profileNav"><button id="searchShelfBtn" class="textButton" type="button">Bookshelf</button><span class="navSep">/</span><span>Search library</span></div>
@@ -318,6 +333,11 @@
   <input id="writerBackupFileInput" type="file" accept=".zip,application/zip" hidden>
   <dialog id="restorePreviewDialog" class="backupDialog" aria-labelledby="restorePreviewHeading"><div class="dialogBody"><h2 id="restorePreviewHeading">Review writer backup</h2><p id="restorePreviewDetails"></p><p class="helper">Restoration creates a NEW writer profile; it never overwrites your existing writer or character files. Confirm only after checking the details.</p><label class="restoreNameLabel">Name for restored writer<input id="restoreWriterName" type="text" maxlength="100" placeholder="Writer name (Restored)"></label><p id="restorePreviewStatus" class="helper" role="status"></p><div class="dialogActions"><button id="cancelRestoreBtn" class="quiet" type="button">Cancel</button><button id="confirmRestoreBtn" class="primary" type="button">Restore as separate writer</button></div></div></dialog>
   <dialog id="revisionHistoryDialog" class="revisionHistoryDialog" aria-labelledby="revisionHistoryHeading"><div class="dialogBody"><h2 id="revisionHistoryHeading">Character Revision History</h2><p class="helper">Saved snapshots from earlier editing sessions. Restoring a revision first backs up your current profile.</p><div id="revisionHistoryList" class="revisionHistoryList"></div><div class="dialogActions"><button id="closeRevisionsBtn" type="button" class="quiet">Close</button></div></div></dialog>
+  <footer class="appFooter" id="appFooter">
+    <div class="footerBrand"><span class="footerSymbol" aria-hidden="true">✦</span> Character Bookshelf</div>
+    <div class="footerLinks"><button id="footerStorageBtn" type="button" class="footerLink">Storage status</button><button id="releaseNotesBtn" type="button" class="footerLink">Release notes</button><span id="footerVersion" class="footerVersion">v4.0</span></div>
+  </footer>
+  <dialog id="releaseHistoryDialog" class="releaseHistoryDialog" aria-labelledby="releaseHistoryTitle"><div class="dialogBody"><div class="releaseHistoryHeading"><div><p class="pageKicker">APPLICATION HISTORY</p><h2 id="releaseHistoryTitle">Release notes</h2></div><button id="closeReleaseHistoryBtn" type="button" class="quiet">Close</button></div><p class="helper">The evolution of Character Bookshelf, beginning with its first working USB release.</p><div id="releaseHistoryList" class="releaseHistoryList"></div></div></dialog>
   <div id="toast" class="toast hidden" role="alert"></div>
 </body>
 </html>
