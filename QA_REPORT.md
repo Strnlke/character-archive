@@ -1,4 +1,4 @@
-# Character Bookshelf v4.1 — QA Report
+# Character Bookshelf v4.1.1 — QA Report
 
 ## Automated results
 
@@ -36,3 +36,21 @@ All **eight** referenced screenshot assets exist; images loaded with their expec
 6. Test a copied library on your actual flash drive after deploying, and verify: normal saves, manual reauthorization, ZIP contents, Series copying, and recovery-to-another-folder.
 
 **Release decision:** Automated acceptance checks passed. Suitable for controlled end-user testing with verified backups; real-hardware and live-host acceptance are still outstanding.
+
+
+## v4.1.1 unified-shelf patch verification
+
+**20 / 20 patch-specific Chromium checks passed** in a disposable, isolated browser page.
+These checks are **additional** to the previous v4.1 release's 64 scenario checks;
+the complete earlier suite was not rerun during this small patch.
+
+Patch tests covered ordinary five-book shelf rows, series-member adjacency, no
+series-only shelf headings, five linked labels across two series, standalone books,
+accessible series button labels, correct navigation to each Series page, ordinary
+novel-cover click behavior, unlinked books, a series longer than five books, and
+successful series-button navigation at a mobile viewport. No uncaught browser JS
+exceptions occurred in those exercised paths.
+
+The tutorial's bookshelf screenshot was recaptured from the modified interface
+using synthetic QA novels. Browser tests used DOM-injected scripts and simulated
+storage; this is not a test on a physical USB drive or the deployed site.

@@ -62,9 +62,10 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.1';
+const APP_VERSION = '4.1.1';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
+  ['4.1.1','Unified Series Bookshelf',['Linked novels now share ordinary bookshelf rows with standalone novels','Small clickable series labels on linked covers lead straight to the correct Series page','No character, timeline, or novel files are migrated or modified']],
   ['4.1','Series & Manuscript Update',['Writer-level series organization, independently copied characters and deferred relationship links','Combined read-only series timelines with undated events separated','Character mention navigation for DOCX and TXT manuscripts; PDF page viewer retained','Smaller RAM recovery without manuscript copies; writer search index','Optional illustrated, pop-out tutorial with persistent footer access']],
   ['4.0.2','Relationship Color Hotfix',['Fixed an older CSS rule overriding relationship-specific tree line, label, and border colors','Preserved existing tree layout, links, exports, and library data']],
   ['4.0.1','Pinned Navigation Hotfix',['Top navigation remains visible while scrolling, including on narrower screens','Header height is measured automatically to prevent page content from being obscured','Updated stylesheet and script references to avoid using older cached assets']],
@@ -1238,6 +1239,20 @@ function makeBook(novel, index) {
     if(state.novel?.id===novel.id)await showManuscript();
   });
   tile.append(button, manuscript, remove);
+  const series=seriesForBook(novel.id);
+  if(series){
+    const position=series.bookIds.indexOf(novel.id)+1;
+    const seriesLink=el('button','bookSeriesLink','◇ '+series.name);
+    seriesLink.type='button';
+    seriesLink.title='Open '+series.name+' series · Book '+position+' of '+series.bookIds.length;
+    seriesLink.setAttribute('aria-label',seriesLink.title);
+    seriesLink.addEventListener('click',()=>{
+      state.activeSeries=series.id;
+      void showSeries();
+    });
+    tile.classList.add('bookSeriesMember');
+    tile.append(seriesLink);
+  }
   return tile;
 }
 async function showBookshelf() {
@@ -1258,10 +1273,6 @@ async function showBookshelf() {
     let i=0;
     for (const group of renderShelfSeries()){
       const shelf=el('div','bookShelf');
-      if(group.series){
-        const title=el('button','seriesShelfLabel','◇ '+group.series.name+' · Series');
-        title.type='button';title.onclick=()=>{state.activeSeries=group.series.id;void showSeries();};shelf.append(title);
-      }
       const books=el('div','bookShelfRow');
       for(const novel of group.books)books.append(makeBook(novel,i++));
       shelf.append(books,el('div','shelfPlank'));container.append(shelf);

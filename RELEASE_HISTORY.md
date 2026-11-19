@@ -1,5 +1,12 @@
 # Character Bookshelf — Release History
 
+## v4.1.1 — Unified Bookshelf Series Links
+
+- Removed dedicated bookshelf rows and headings for series.
+- Linked books now remain among standalone novels on the ordinary bookshelf, grouped beside each other in series order.
+- A subtle clickable ◇ series label on each linked cover opens its specific Series page.
+- Updated the tutorial and actual bookshelf screenshot for the unified layout.
+
 ## v4.1 — Linked Novel Series, Manuscript Navigation & Reliability
 
 - Link novels within a named series, display them together on the bookshelf, and reorder them without moving the original folders.

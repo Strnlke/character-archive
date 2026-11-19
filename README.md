@@ -1,14 +1,14 @@
-# Character Bookshelf v4.1 — Series & Manuscript Update
+# Character Bookshelf v4.1.1 — Unified Bookshelf Patch
 
 Character Bookshelf is a locally stored writing-reference application for writer profiles, novels, characters, relationship trees, structured timelines, manuscript reference copies, and writer backups. The library remains in a folder you explicitly authorize (typically a USB flash drive). The application does not synchronize your records to a cloud account.
 
-## Install / upgrade from v4.0.2
+## Install / upgrade from v4.1 or v4.0.2
 
 1. **Export a writer ZIP backup and separately copy your entire existing Character Bookshelf USB folder.** Verify that your originals are safely retained before testing an update.
-2. Extract this ZIP. In your GitHub repository's existing `character-archive` Pages root, replace **`index.html`, `app.js`, and `styles.css`**, and add **`series-v41.js`, `manuscript-v41.js`, `tutorial.html`,** and the **entire `tutorial-assets/` folder**. Keep those filenames and directories exactly as supplied; all assets are local and load alongside `index.html`.
-3. Commit and allow GitHub Pages to deploy, then refresh the page when no edits are pending. The HTML requests versioned `?v=4.1` JS and CSS assets to help avoid stale browser cache.
+2. Extract this ZIP. In your GitHub repository's existing `character-archive` Pages root, replace **`index.html`, `app.js`, `styles.css`, `series-v41.js`, `manuscript-v41.js`, `tutorial.html`**, and the **entire `tutorial-assets/` folder**. Keep those filenames and directories exactly as supplied; all assets are local and load alongside `index.html`.
+3. Commit and allow GitHub Pages to deploy, then refresh the page when no edits are pending. The HTML requests versioned `?v=4.1.1` JS and CSS assets to help avoid stale browser cache.
 4. Open your usual USB library. Start with a **copied test library** or a disposable writer before opening important work. Check the storage-status panel and verify at least one normal save and writer ZIP backup.
-5. Leave the prior v4.0.2 source files available as a rollback option. **Do not restore an older source while unsaved edits are pending.**
+5. Leave your prior working source files (v4.1 or v4.0.2) available as a rollback option. **Do not restore an older source while unsaved edits are pending.**
 
 **Supported for USB-folder access:** recent desktop Chrome and Edge using HTTPS (e.g., GitHub Pages) or localhost and their File System Access API. Other browsers may not support the same folder authorization workflow. The reader is responsive, but browser file-system permissions and pop-out window behaviors vary by platform.
 
@@ -39,3 +39,10 @@ Character Bookshelf is a locally stored writing-reference application for writer
 See **`QA_REPORT.md`** for test scope, results, and environment limits. This release was tested in a disposable simulated Chromium USB file system; it was **not** tested against your real flash drive or the deployed GitHub Pages site. Preserve a separate backup and verify a few test saves before using it for unrecoverable work.
 
 See **`RELEASE_HISTORY.md`** for earlier releases.
+
+## v4.1.1 bookshelf refinement
+
+Linked novels appear on the **same regular bookshelf rows** as all other novels,
+next to their series companions. There are no separate series-only shelves.
+A small ◇ series label on each linked book opens that series directly.
+Standalone books are displayed normally. No library-data migration is needed.

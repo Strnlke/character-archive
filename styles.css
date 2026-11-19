@@ -522,3 +522,10 @@ html{scroll-padding-top:calc(var(--bookshelf-topbar-height) + 20px)}
 .tutorialDialogBar>div{display:flex;gap:8px}.tutorialDialogBar strong{font-size:14px}
 .tutorialDialog iframe{border:0;display:block;width:100%;height:calc(100% - 66px);background:#111a26}
 @media(max-width:600px){.tutorialDialogBar{align-items:flex-start}.tutorialDialogBar strong{font-size:12px}.tutorialDialog iframe{height:calc(100% - 110px)}}
+
+/* v4.1.1 — Linked novels stay on the ordinary bookshelf, not on series-only shelves.
+   The small on-cover link opens that specific series without hijacking the book. */
+.bookSeriesMember>.bookCover{border-bottom-color:#9fb7c9;box-shadow:inset 6px 0 6px #09131d9c,inset -3px 0 4px #050d16a0,5px 9px 12px #000a,0 2px 0 #7998b4}
+.bookSeriesLink{position:absolute;z-index:4;left:6px;top:7px;max-width:calc(100% - 47px);min-height:25px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2;border:1px solid #adc4d080;border-radius:5px;background:#111f30ed;color:#d0dfed;font-size:10px;font-weight:700;padding:5px 7px;text-align:left;box-shadow:0 1px 5px #050a1280}
+.bookSeriesLink:hover,.bookSeriesLink:focus-visible{background:#34506b;color:white;border-color:#a4c9eb;text-decoration:underline}
+@media(max-width:750px){.bookSeriesLink{left:4px;top:5px;max-width:calc(100% - 44px);padding:5px 4px;font-size:9px}}

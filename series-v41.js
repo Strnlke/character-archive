@@ -29,15 +29,30 @@ async function persistSeries(next){
 }
 function seriesForBook(id){return state.series.find(s=>s.bookIds.includes(id))||null;}
 function renderShelfSeries(){
-  // Series members are adjacent, even if a shelf would otherwise split them.
-  const groups=[];
-  for(const series of state.series){
-    const books=series.bookIds.map(id=>state.novels.find(n=>n.id===id)).filter(Boolean);
-    if(books.length)groups.push({series,books});
+  // Keep one ordinary bookshelf. Series members stay adjacent in series order,
+  // with each row still using the same five-book shelf capacity as before.
+  const bookGroups=[],seen=new Set();
+  for(const novel of state.novels){
+    if(seen.has(novel.id))continue;
+    const series=seriesForBook(novel.id);
+    const books=series
+      ? series.bookIds.map(id=>state.novels.find(book=>book.id===id)).filter(Boolean)
+      : [novel];
+    for(const book of books)seen.add(book.id);
+    if(books.length)bookGroups.push(books);
   }
-  const standalone=state.novels.filter(n=>!seriesForBook(n.id));
-  for(let start=0;start<standalone.length;start+=5)groups.push({series:null,books:standalone.slice(start,start+5)});
-  return groups;
+  const shelves=[];let row=[];
+  const endRow=()=>{if(row.length){shelves.push({books:row});row=[];}};
+  for(const group of bookGroups){
+    // Do not split a small series merely because only one space remains.
+    if(group.length<=5 && row.length && group.length>5-row.length)endRow();
+    for(const book of group){
+      if(row.length===5)endRow();
+      row.push(book);
+    }
+  }
+  endRow();
+  return shelves;
 }
 async function showSeries(){
   if(!(await flush())){toast('Save changes before opening Series.',true);return;}
