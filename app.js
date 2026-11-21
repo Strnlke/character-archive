@@ -62,9 +62,10 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.1.2';
+const APP_VERSION = '4.1.3';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
+  ['4.1.3','Mobile Interface Update',['Mobile-only compact application menu with visible save status','Responsive bookshelf spacing, horizontal recent-work cards, and touch-friendly books','Novel actions, character gallery and editor adapted for small screens','Manuscript, notes, series and timeline controls adapted for mobile','Desktop styles, storage behavior and library format remain unchanged']],
   ['4.1.2','Character Development & Manuscript Notes',['Generic arc prompts for new characters; existing profiles keep their original questions and gain a freeform arc-type field','Drag-and-drop import zones for DOCX, PDF, TXT and reviewed character JSON','Manuscript annotations and quote-based relocation, printable margin-note exports for TXT/DOCX','Novel-wide notes, custom character tags and gallery filters','Live RAM recovery usage, inline novel-title editing and desktop button alignment']],
   ['4.1.1','Unified Series Bookshelf',['Linked novels now share ordinary bookshelf rows with standalone novels','Small clickable series labels on linked covers lead straight to the correct Series page','No character, timeline, or novel files are migrated or modified']],
   ['4.1','Series & Manuscript Update',['Writer-level series organization, independently copied characters and deferred relationship links','Combined read-only series timelines with undated events separated','Character mention navigation for DOCX and TXT manuscripts; PDF page viewer retained','Smaller RAM recovery without manuscript copies; writer search index','Optional illustrated, pop-out tutorial with persistent footer access']],

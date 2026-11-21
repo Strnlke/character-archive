@@ -1,37 +1,46 @@
-# Character Bookshelf v4.1.2 — Stability and Release QA
+# Character Bookshelf v4.1.3 — Mobile Quality Assurance
 
-## Result
+## Verdict
 
-**39/39 checks passed in an isolated Chromium browser simulation** with **zero uncaught JavaScript errors** in that suite. JavaScript syntax checks passed for all four source scripts. The tutorial has **11 functional navigation topics** and **11 verified screenshot references**; its topic navigation was exercised at desktop and phone-sized viewport widths.
+**PASS — 75 of 75 automated responsive navigation and presentation checks.** No unhandled browser JavaScript exceptions in the simulated Chromium sessions. These are **not** 75 independent full data/storage regression tests.
 
-This is a meaningful functional test result, **not certification of zero bugs**. The browser environment blocked requests to local test URLs, so the automated suite loaded the same release HTML/CSS/JS into an isolated page with in-memory substitutes for the browser's local file handles. The deployed GitHub Pages site, production USB flash drives, real-world storage permission prompts, complex DOCX files, multi-hundred-page PDFs, printing on all browsers, and Android devices **were not tested for this release**.
+## Test setup
 
-## Checks performed
+- Release basis: the official v4.1.2 ZIP already supplied in this conversation.
+- Browser: headless Chromium, loaded in an isolated in-memory page because direct localhost navigation is blocked by the testing environment.
+- Test library: disposable, simulated File System Access handles; three invented sample novels and five invented characters. The user's real books, drive, and deployed website were untouched.
+- Widths tested: **320, 375, 390, 430, 768, 1024, 1366 CSS pixels**.
+- Automated actions: select simulated library, choose writer, open book, navigate Timeline, Manuscript and Novel Notes; check overflow and JavaScript errors. On phones, expand and collapse the top menu, check Storage Status button visibility, check action placement and minimum height, open a character editor, the tree and Series page.
 
-- Legacy novel and character data still open; original Beliefs prompts remain on existing characters. New characters get Lie, Truth, Want, Need and starting-circumstances fields. Both kinds receive a freeform arc field.
-- Novel title changes in place while retaining the existing storage-folder name.
-- Desktop novel action buttons align; novel data remains accessible.
-- General novel notes save as standalone JSON; note edits are guarded against external file conflicts; writer-wide search finds note content.
-- Character tags save, appear as available filter choices, and filter the gallery correctly.
-- DOCX/TXT passage and chapter notes save with location metadata, survive a manuscript replacement, relocate when exact unique text moves, and become safely unlinked when source text disappears.
-- Ambiguous repeated text is flagged for review, not silently reattached to an arbitrary occurrence.
-- Native PDF notes support page anchoring and a truthful **notes-only** printable report; no false claim is made that original PDF pages are embedded in it.
-- TXT/DOCX annotated print export opens a separate printable document containing manuscript paragraphs and side notes, without altering the original stored manuscript.
-- Dragged-in manuscripts use the existing replacement flow. Dragged-in character JSON opens the existing compare/review flow, and cancel leaves the character count unchanged.
-- The RAM recovery snapshot contains note JSON but excludes imported manuscript-reference bytes.
-- No uncaught JavaScript errors during the primary 39-test sequence.
-- Tutorial topic links worked in isolated Chromium at desktop and narrow viewport widths. All screenshot files referenced by the tutorial exist.
+## Findings
 
-## Known limitations / release cautions
+| Category | Result |
+|---|---|
+| Basic navigation, menu and bookshelf | PASS |
+| All tested pages fit viewport (without horizontal page-level scroll) | PASS |
+| Novel action buttons stack below title on phones | PASS |
+| Mobile touch controls at least approximately 44 px high | PASS |
+| Mobile bookshelf gap is reduced | PASS |
+| Timeline, manuscript, notes, editor, tree and series navigation | PASS |
+| No unhandled JavaScript errors in checked flows | PASS |
+| JS syntax checks for all app scripts | PASS |
+| Desktop pixel comparison: 1024px and 1366px | 0 changed pixels in first 620px of bookshelf and novel pages |
+| ZIP package integrity | Checked after packaging |
 
-1. **Native PDF viewer:** Passage selection and precise in-document highlighting are not available for PDF, and annotated export of actual PDF pages is not supported. PDF manuscripts can have page notes and a separate notes-only print report.
-2. **TXT/DOCX export:** The “Export annotated PDF” action opens a *printable HTML view*, where the writer chooses their browser's **Print → Save as PDF**. It does not automatically produce a PDF file. Pop-up blocking may prevent the new tab.
-3. **Anchor stability:** Automatic reattachment can never guarantee success across substantial rewrites, repeated phrases, or structural differences in extracted DOCX text. The app retains unmatched notes; verify the proposed locations when changing drafts.
-4. **USB and browsers:** The library is controlled by the browser's File System Access permissions. The application was not tested on the user's physical USB drive or on the live hosting domain in this session. Test on disposable folders first, especially backup, recovery, and permission failures.
-5. **Mobile:** Only limited layout smoke checks were performed. A dedicated phone-layout redesign is deliberately excluded from this release and is planned separately so it can be rolled back without losing unrelated features.
-6. **Backwards compatibility:** v4.1.1 will ignore the additional sidecar note files and new character fields, but will not display or edit v4.1.2-only data. Always back up the library before deploying or rolling back. The existing v4.1.1 series/restore test suite was not rerun in full after these additive changes.
-7. **Recovery isn't backup:** The snapshot is volatile, has size and file-count limits, may be partial, and does not retain imported manuscripts. Keep independent writer ZIPs and original writing documents.
+A first pass detected a **768px overflow on the novel page**. A narrow-tablet-only breakpoint fixed it; all 75 checks passed afterward.
 
-## Release recommendation
+## Limitations / follow-up QA
 
-The package passed its scoped simulated QA and is suitable for **careful testing using a disposable library**. Do not replace a known-good copy or rely on it as the sole repository of notes until the writer ZIP and emergency recovery have been verified on actual hardware. Record any failures and preserve the old release ZIP for rollback.
+- Testing took place in **simulated Chromium**, not on a physical Android phone, USB flash drive, Firefox, Safari or live GitHub Pages deployment.
+- The test fixture is intentionally small and did not repeat the previous version's full data-integrity, import, backup, save-failure, recovery, and large-library stress suites.
+- The desktop comparison covered two important pages and screenshot regions, not every conceivable desktop dialog or viewport. The new CSS is scoped to `max-width: 970px`; application storage functions were not changed.
+- File permissions and native system file pickers vary by browser and device. The user reported their Android storage workflow works already, but this was not independently rechecked here.
+- The mobile menu is generated by JavaScript; the original toolbar remains a fallback if that script fails.
+
+## Installation and rollback
+
+1. Export and verify a backup of your existing library.
+2. Keep the full v4.1.2 release ZIP.
+3. Upload the entire v4.1.3 website package, including `mobile-v413.css`, `mobile-v413.js`, `tutorial.html` and `tutorial-assets/`.
+4. Test the new mobile Menu, bookshelf, Characters page, manuscript, and Save Status on your device.
+5. If needed, redeploy **all v4.1.2 website files**. No USB data conversion or restore should be necessary because this patch does not modify file formats.

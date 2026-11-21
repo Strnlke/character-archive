@@ -1,3 +1,17 @@
+# Release History
+
+## v4.1.3 — Dedicated Mobile Update
+
+- Mobile-only compact action menu; save and recovery status remain visible.
+- Fixed cramped book/novel headings and inconsistent action layouts on narrow screens.
+- Tightened vertical gap above book covers; horizontally scrollable recent characters and shelf rows on phones.
+- Touch-friendly navigation on character, tree, series, timeline, manuscript, notes, and character gallery views.
+- Fix for 768px novel heading overflow; desktop reference at 1024px and 1366px pixel-identical in sampled regions.
+- Tutorial expanded with mobile instructions and actual test-build screenshots.
+- **No storage or file-schema changes.** Dedicated release for easy code-only rollback to v4.1.2.
+
+---
+
 # Character Bookshelf — Release History
 
 ## v4.1.2 — Character Development & Manuscript Notes

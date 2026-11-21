@@ -1,0 +1,140 @@
+/* Character Bookshelf v4.1.3 — mobile-only presentation layer.
+   No changes to the desktop layout or the library data model. */
+.mobileMenuToggle{display:none}
+@media (max-width:750px){
+  /* The brand and save indicator remain visible; tools expand on demand. */
+  .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;gap:5px 10px;padding:10px 14px 8px;max-height:min(84dvh,640px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+  .topbar .brand{min-width:0;grid-column:1;grid-row:1;gap:10px;justify-self:start;text-align:left}
+  .topbar .brandWords{min-width:0}
+  .topbar .brandWords strong{font-size:15px;white-space:normal}
+  .topbar .brandWords small{font-size:11px}
+  .topbar .brand-icon{width:39px;height:39px;flex:none}
+  .mobileMenuToggle{display:inline-flex;grid-column:2;grid-row:1;align-items:center;justify-content:center;gap:7px;min-width:86px;min-height:42px;border-radius:9px;background:#1c2d40;border:1px solid #445c78;color:#e4efff;font-size:13px;font-weight:750}
+  .mobileMenuToggle[aria-expanded="true"]{background:#345575;border-color:#84a7cc}
+  .topbar .topactions{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;flex:none;min-width:0;width:100%;max-width:100%;overflow:visible;padding:0;white-space:normal}
+  .topbar .topactions>.status{grid-column:1/-1;display:block;width:100%;text-align:left;margin:0;color:#a9c0db;white-space:normal;overflow-wrap:anywhere;font-size:12px;min-height:16px}
+  .topbar .topactions>.recoveryMeter:not(.hidden){grid-column:1/-1;justify-self:start;white-space:normal}
+  .topbar.mobileMenuReady .topactions>button{display:none;min-width:0;max-width:100%;width:100%;min-height:44px;padding:9px 9px;font-size:12px;line-height:1.25;text-align:center;white-space:normal;align-items:center;justify-content:center;margin:0}
+  .topbar .topactions.mobileExpanded>button:not(.hidden){display:flex}
+  .topbar .topactions.mobileExpanded{padding-bottom:8px}
+  .topbar .topactions.mobileExpanded #backupBtn,.topbar .topactions.mobileExpanded #changeFolderBtn{grid-column:span 1}
+  .topbar.mobileMenuReady .topactions #undoBtn:disabled{display:none}
+
+  /* Writer bookshelf: vertically paced heading and a shallow recent-work strip. */
+  .workspace.galleryMode .mainPanel,.mainPanel{padding:18px 16px 58px}
+  .shelfHeading,.novelHeading{display:flex;flex-direction:column;align-items:stretch;gap:14px;margin-bottom:20px}
+  .shelfHeading h1,.novelHeading h1{font-size:clamp(27px,8vw,34px);line-height:1.12;letter-spacing:-.55px;overflow-wrap:anywhere}
+  .shelfHeading p,.novelHeading p{font-size:13px;line-height:1.5}
+  .shelfActionGroup{display:grid;grid-template-columns:1fr 1fr;gap:9px;width:100%;align-items:stretch}
+  .shelfActionGroup>.quiet,.shelfActionGroup>.primary{height:auto;min-height:44px;width:100%;margin:0;white-space:normal;font-size:13px}
+  .recentBox{padding:13px 12px;margin-bottom:13px}
+  .recentHeading{gap:4px 10px;margin-bottom:10px}
+  .recentHeading h2{font-size:15px}
+  .recentHeading .muted{font-size:11px}
+  .recentGrid{display:flex;overflow-x:auto;gap:9px;scroll-snap-type:x proximity;overscroll-behavior-x:contain;padding-bottom:3px}
+  .recentGrid .recentCharacter{flex:0 0 min(75vw,235px);min-width:0;scroll-snap-align:start;min-height:76px;padding:10px 12px}
+  .shelfBooks{padding:0 0 12px}
+  .bookShelf{padding:0 0 13px;margin:0 0 16px}
+  .bookShelfRow{display:flex;align-items:flex-end;justify-content:flex-start;gap:12px;min-height:0;padding:0 4px 0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;overscroll-behavior-x:contain;scrollbar-width:thin}
+  .bookTile{flex:0 0 clamp(126px,41vw,156px);width:clamp(126px,41vw,156px);min-width:0;max-width:none;scroll-snap-align:start}
+  .bookCover{height:clamp(186px,55vw,211px);min-width:0;max-width:none}
+  .bookFront{padding:20px 10px 15px 12px}
+  .bookTitle{font-size:clamp(13px,3.65vw,16px)}
+  .bookOrnament{font-size:21px}
+  .bookSeriesLink{max-width:calc(100% - 44px)}
+  .shelfPlank{height:16px}
+  .manuscriptShelfButton{min-height:38px;font-size:12px;padding:7px 3px}
+
+  /* Novel landing page: title gets a full row, controls become finger-friendly. */
+  .novelHeading .novelTitleControl{max-width:100%}
+  .novelHeading .novelTitleEditBtn h1{font-size:clamp(27px,8vw,35px)}
+  .novelActions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);width:100%;gap:8px;align-items:stretch;justify-content:stretch}
+  .novelActions>button,.novelActions>.fileLabel{min-width:0;width:100%;min-height:44px;height:auto;display:flex;justify-content:center;align-items:center;text-align:center;padding:10px 7px;white-space:normal;font-size:12px;line-height:1.25}
+  .novelActions>.primary{grid-column:1/-1}
+  .collectionHeading{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px;align-items:stretch;margin-bottom:14px;padding-bottom:13px}
+  .collectionHeading h2{align-self:center;font-size:19px}
+  .collectionHeading .gallerySortLabel{display:flex;gap:7px;align-items:center;justify-content:flex-end;font-size:12px;min-width:0;margin:0}
+  .collectionHeading .gallerySortLabel select{width:100%;min-width:0;max-width:165px;font-size:12px}
+  .collectionHeading button{width:100%;min-width:0;min-height:43px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;white-space:normal;padding:7px 6px;font-size:12px}
+  .collectionHeading .count{align-self:center;justify-self:start}
+  .collectionHeading .spacer{display:none}
+  .characterTagFilter{margin:0 0 13px;justify-content:stretch;flex-wrap:wrap}
+  .characterTagFilter select{flex:1;max-width:100%;min-width:0}
+  .fileDropZone{margin:9px 0 13px;padding:13px 8px}
+  .characterGallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+  .characterCard{min-height:0}
+  .galleryPortrait{height:clamp(116px,37vw,160px)}
+  .galleryName{font-size:14px}
+  .galleryBody{padding:10px}
+  .characterDeleteBtn{width:32px;height:32px}
+
+  /* Shared mobile controls for secondary views and editing. */
+  .seriesHeaderActions,.seriesHeader,.seriesHeading,.manuscriptHeading,.timelineToolbar,.treeHeading{gap:12px}
+  .seriesHeading,.manuscriptHeading,.treeHeading{align-items:flex-start;flex-direction:column}
+  .seriesHeading>.primary,.notesHeading>.primary{min-height:44px}
+  .seriesBooks{gap:10px}
+  .seriesBookCard{width:calc(50% - 5px);min-width:0}
+  .seriesMiniCover{height:155px}
+  .seriesBookActions button{min-height:36px}
+  .seriesCopyGrid{grid-template-columns:minmax(0,1fr)}
+  .seriesCopyGrid .primary{min-height:44px}
+  .timelineFormGrid{grid-template-columns:minmax(0,1fr)}
+  .timelineToolbar .timelineModes{flex-wrap:wrap}
+  .manuscriptActions{width:100%;display:flex;gap:8px;flex-wrap:wrap}
+  .manuscriptActions>.fileLabel,.manuscriptActions>button{min-height:44px}
+  .manuscriptText{padding:20px 17px;min-height:320px;height:59vh}
+  .manuscriptReaderShell{grid-template-columns:1fr}
+  .manuscriptMentionsPanel{padding:12px}
+  .manuscriptCharacterList{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .readingToolbar{flex-wrap:wrap;gap:9px}
+  .readingToolbar button{min-height:39px}
+  .annotationPanel{padding:12px}
+  .annotationHeading>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .annotationHeading>div>button{min-height:43px;white-space:normal;padding:7px;font-size:12px}
+  .annotationHeading>div>#exportAnnotatedBtn{grid-column:1/-1}
+  .characterHeader{align-items:flex-start;flex-wrap:wrap;gap:12px}
+  .characterHeader .portrait{width:78px;height:78px}
+  .characterTitle{min-width:0}
+  .portraitActions{flex-wrap:wrap}
+  .sectionBody{padding:14px}
+  .section summary{padding:14px 15px}
+  .workspace.editorMode .sidebar{width:100%;max-width:100%;height:auto;position:static}
+  .editorSideTools .sidebarBlock:first-child{display:flex;flex-direction:row;gap:7px;align-items:center;overflow-x:auto;padding:9px 11px}
+  .editorSideTools .sidebarBlock:first-child>.eyebrow{display:none}
+  .editorSideTools .sidebarBlock:first-child>.sideButton{min-height:40px;flex:0 0 auto;width:auto;margin:0;padding:8px 10px;font-size:12px;white-space:nowrap}
+  .editorSideTools .sidebarBlock:last-child{display:flex;flex-direction:row;gap:7px;padding:4px 11px 9px}
+  .editorSideTools .sidebarBlock:last-child>.eyebrow{display:none}
+  .editorSideTools .sidebarBlock:last-child>.sideButton{margin:0;min-height:40px;font-size:12px}
+  .profileNav,.treeBreadcrumb{margin-bottom:14px;scroll-margin-top:calc(var(--bookshelf-topbar-height) + 12px)}
+  .dialogActions{flex-wrap:wrap}
+  .toast{left:12px;right:12px;bottom:12px;max-width:none}
+  .appFooter{padding:14px 16px}
+}
+@media(max-width:360px){
+  .topbar{padding:9px 11px}
+  .mobileMenuToggle{min-width:75px}
+  .collectionHeading .gallerySortLabel{flex-wrap:wrap;justify-content:flex-start}
+  .collectionHeading .gallerySortLabel select{max-width:none}
+  .novelActions,.annotationHeading>div{gap:6px}
+  .characterGallery{gap:8px}
+}
+/* Place the character count next to its heading; keep export buttons paired. */
+@media(max-width:750px){
+  .collectionHeading h2{grid-column:1;grid-row:1}
+  .collectionHeading .count{grid-column:1;grid-row:1;justify-self:end;align-self:center;margin-right:6px}
+  .collectionHeading .gallerySortLabel{grid-column:2;grid-row:1}
+  #novelTreeBtn{grid-column:1;grid-row:2}
+  #novelTimelineBtn{grid-column:2;grid-row:2}
+  #novelManuscriptBtn{grid-column:1;grid-row:3}
+  #novelNotesBtn{grid-column:2;grid-row:3}
+  #exportPdfNovelBtn{grid-column:1;grid-row:4}
+  #exportDocxNovelBtn{grid-column:2;grid-row:4}
+}
+/* Only the narrow-tablet band requires an additional column break.
+   Desktop at 1024px and above retains the original v4.1.2 arrangement. */
+@media(min-width:751px) and (max-width:970px){
+  .novelHeading{flex-direction:column;align-items:stretch;gap:16px}
+  .novelHeading .novelActions{justify-content:flex-start}
+  .novelHeading .novelActions>*{max-width:100%}
+  .collectionHeading{flex-wrap:wrap}
+}
