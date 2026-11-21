@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Character Bookshelf v4.1.1 · Getting Started</title>
+<title>Character Bookshelf v4.1.2 · Getting Started</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#111a26;color:#e8f1fa}
 *{box-sizing:border-box}body{margin:0}.tutorialHeader{height:auto;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:18px 27px;border-bottom:1px solid #39506a;background:#152233}
@@ -21,16 +21,18 @@ figure{margin:24px 0;border:1px solid #44586d;padding:9px;border-radius:12px;bac
 </style>
 </head>
 <body>
-<header class="tutorialHeader"><div class="tutorialBrand">✦ Character Bookshelf <span class="tutorialVersion">Tutorial · v4.1.1</span></div><button class="outlineBtn" id="tutorialPopOut" type="button">↗ Open in separate window</button></header>
+<header class="tutorialHeader"><div class="tutorialBrand">✦ Character Bookshelf <span class="tutorialVersion">Tutorial · v4.1.2</span></div><button class="outlineBtn" id="tutorialPopOut" type="button">↗ Open in separate window</button></header>
 <div class="tutorialLayout"><nav id="tutorialNav" aria-label="Tutorial topics">
   <h2>TOPICS</h2>
   <a href="#welcome" data-topic="welcome">Getting Started</a>
   <a href="#writers" data-topic="writers">Writer Profiles</a>
   <a href="#books" data-topic="books">Books &amp; Characters</a>
+  <a href="#novelnotes" data-topic="novelnotes">Novel-Wide Notes</a>
   <a href="#relationships" data-topic="relationships">Character Tree</a>
   <a href="#timeline" data-topic="timeline">Timelines</a>
   <a href="#series" data-topic="series">Novel Series</a>
   <a href="#reader" data-topic="reader">Manuscript Reader</a>
+  <a href="#annotations" data-topic="annotations">Manuscript Notes</a>
   <a href="#search" data-topic="search">Search &amp; Imports</a>
   <a href="#recovery" data-topic="recovery">Backups &amp; Recovery</a>
 </nav>
@@ -52,9 +54,17 @@ figure{margin:24px 0;border:1px solid #44586d;padding:9px;border-radius:12px;bac
 </section>
 <section class="topic" id="books">
 <h1>Books &amp; Characters</h1>
-<ol><li>Choose <strong>New novel</strong> on the bookshelf to create a book.</li><li>Select its cover to open the character gallery.</li><li>Choose <strong>New character</strong> and enter the name.</li><li>Fill in the six profile sections and allow the save status to confirm your changes.</li><li>Optional: add <strong>Aliases &amp; nicknames</strong> under Basic Information, separated with commas, semicolons, or new lines. Only variations you enter will be searched in the manuscript.</li></ol>
+<ol><li>Choose <strong>New novel</strong> on the bookshelf to create a book.</li><li>Select its cover to open the character gallery.</li><li>Choose <strong>New character</strong> and enter the name.</li><li>Fill in the six profile sections and allow the save status to confirm your changes. New characters have general questions about the Lie, Truth, Want, Need, formative experiences and starting circumstances. Earlier characters retain their original questions; all characters have an optional freeform <strong>Character arc type</strong>.</li><li>Optional: add <strong>Aliases &amp; nicknames</strong> under Basic Information, separated with commas, semicolons, or new lines. Only variations you enter will be searched in the manuscript.</li></ol>
 <figure><img src="tutorial-assets/character.png" alt="Character editor showing the six sections and aliases and nicknames field"><figcaption>Character details stay in the selected novel’s folder. <a href="tutorial-assets/character.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<figure><img src="tutorial-assets/character-questions-v412.png" alt="New-character personality fields for the Lie, Truth, Want and Need"><figcaption>New character-development prompts. Existing profiles keep their previous questions. <a href="tutorial-assets/character-questions-v412.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<p>To <strong>rename a book</strong>, open its character gallery and hover over the book title (or use the pencil shown on touch screens). Click the title, enter the new text, and save or cancel. This doesn't rename the underlying storage folder. You can also add your own comma-separated <strong>Character tags</strong> in Basic Information, then use <strong>Filter by tag</strong> in the character gallery.</p>
 <p>Images and book covers are optional. A character you copy between novels becomes a separate profile, so editing one does not modify its counterpart.</p>
+</section>
+<section class="topic" id="novelnotes">
+<h1>Novel-Wide Notes</h1>
+<p>Keep general notes about your novel without attaching them to a character, a timeline entry or a manuscript passage.</p>
+<ol><li>Open the novel’s character gallery and select <strong>Novel notes</strong>.</li><li>Click <strong>Add note</strong>, enter your text, and select <strong>Save note</strong>.</li><li>You can edit or delete notes later. These notes are stored in a separate JSON file inside the same novel folder.</li><li><strong>Search library</strong> also finds your novel notes, and they are included in writer ZIP backups and recovery snapshots.</li></ol>
+<figure><img src="tutorial-assets/novel-notes-v412.png" alt="Novel notes page with a sample note and save controls"><figcaption>Novel-wide notes, separate from the read-only manuscript. <a href="tutorial-assets/novel-notes-v412.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
 </section>
 <section class="topic" id="relationships">
 <h1>Character Tree</h1>
@@ -80,26 +90,33 @@ figure{margin:24px 0;border:1px solid #44586d;padding:9px;border-radius:12px;bac
 <section class="topic" id="reader">
 <h1>Manuscript Reader</h1>
 <p>Import a separate read-only copy of a <strong>DOCX, TXT, or PDF</strong> manuscript into a novel. Your original document stays wherever you keep it.</p>
-<ol><li>Open the book’s <strong>Manuscript</strong> page.</li><li>Select <strong>Import manuscript</strong>, then choose your file (up to 64 MiB).</li><li>For TXT and DOCX, select a character on the right to see mention counts, grouped previews, and Next/Previous controls. Choose a preview to jump and highlight the mention.</li><li>Use the chapter navigation and text-size controls for easier reading.</li></ol>
+<ol><li>Open the book’s <strong>Manuscript</strong> page.</li><li><strong>Drop a PDF, DOCX or TXT file</strong> into the import area, or select <strong>Import manuscript</strong> to browse for one (up to 64 MiB). Replacing an existing copy requires confirmation.</li><li>For TXT and DOCX, select a character on the right to see mention counts, grouped previews, and Next/Previous controls. Choose a preview to jump and highlight the mention.</li><li>Use the chapter navigation and text-size controls for easier reading.</li></ol>
 <figure><img src="tutorial-assets/manuscript.png" alt="TXT manuscript reader with character mention sidebar and highlighted mention"><figcaption>Character mention navigation on a text-based manuscript. <a href="tutorial-assets/manuscript.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
 <div class="guideNote"><strong>PDF limitation:</strong> PDF files open in the browser's native PDF viewer, which does not expose precise text-match locations to this version. Use the browser PDF Find and page navigation. Character mention counts and jump-to-match highlighting are supported for TXT and DOCX only.</div>
+</section>
+<section class="topic" id="annotations">
+<h1>Manuscript Notes &amp; Annotated Export</h1>
+<p>Manuscript notes belong to the novel, not the imported document. Your original text is not changed when notes are created or edited.</p>
+<ol><li>For <strong>TXT and DOCX</strong>, highlight text within one paragraph and select <strong>Passage note</strong>. Type your note and save it.</li><li>Select <strong>Chapter / page note</strong> to attach a general note to the current chapter; on PDFs, this becomes a page note instead.</li><li>Use <strong>Go to location</strong>, <strong>Edit</strong>, or <strong>Delete</strong> on saved notes.</li><li>When a manuscript is replaced, Character Bookshelf compares the saved quote and surrounding text. Clearly identified quotes are relocated. Ambiguous matches need your review, and missing text is marked <strong>Unlinked</strong> without deleting the note.</li><li>For TXT and DOCX, choose <strong>Export annotated PDF</strong>, then choose <strong>Print / Save as PDF</strong> in the new tab to create a printable copy with notes beside the corresponding paragraphs.</li></ol>
+<figure><img src="tutorial-assets/manuscript-notes-v412.png" alt="Notes panel with one passage note and one chapter note"><figcaption>Passage and chapter notes with independent editing. <a href="tutorial-assets/manuscript-notes-v412.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<div class="guideNote"><strong>PDF limitation:</strong> A PDF can receive page notes, but highlighting native PDF text and exporting the original PDF pages with side annotations is not yet supported. The PDF export button produces a <strong>notes-only report</strong> instead. Save your original PDF separately. A changed page number must be reviewed or confirmed after replacement.</div>
 </section>
 <section class="topic" id="search">
 <h1>Search &amp; Imports</h1>
 <p><strong>Universal Search</strong> searches names, character fields, relationship information, novel titles and timeline events for the selected writer. Whole-word matching avoids false hits such as searching for “Ron” inside “chronic.”</p>
 <ol><li>Choose <strong>Search library</strong> from the navigation.</li><li>Enter a word or phrase and select <strong>Search</strong>.</li><li>Click a result to open the matching character or event.</li><li>Use <strong>Refresh View</strong> after editing files from another program to rebuild the temporary search index.</li></ol>
-<p>You can also import compatible character JSON files. Proposed edits can be compared with saved profiles before changes are committed. Nothing is automatically merged.</p>
+<p>You can also <strong>drag and drop a character JSON file</strong> into the Character Gallery, or use <strong>Import character</strong>. Proposed edits can be compared with saved profiles before changes are committed. Nothing is automatically merged. Dragging does not bypass duplicate review.</p>
 <div class="guideNote">The search index is temporary and is rebuilt when needed; it does not create a separate permanent database. External changes may not appear instantly until refreshed or the index becomes stale.</div>
 </section>
 <section class="topic" id="recovery">
 <h1>Backups &amp; Recovery</h1>
 <p>Protect your library by keeping verified backups separate from your primary USB drive.</p>
-<ol><li>Select <strong>Backup &amp; restore</strong>.</li><li>Export the current writer's ZIP. It includes characters, trees, timelines, portraits, book covers, series metadata, and imported manuscript copies.</li><li>Store the backup on a different device and periodically verify its contents.</li><li>Check <strong>Storage status</strong> to see write and recovery information.</li></ol>
-<figure><img src="tutorial-assets/storage.png" alt="Storage and recovery dialog showing RAM snapshot status"><figcaption>Storage status and temporary recovery snapshot. <a href="tutorial-assets/storage.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
+<ol><li>Select <strong>Backup &amp; restore</strong>.</li><li>Export the current writer's ZIP. It includes characters, trees, timelines, portraits, book covers, series metadata, and imported manuscript copies.</li><li>Store the backup on a different device and periodically verify its contents.</li><li>Check <strong>Storage status</strong> to see verified writes, recovery completeness, and the live RAM snapshot size in <strong>MiB</strong> (out of 384 MiB). The compact usage figure also appears near the save status in the header.</li></ol>
+<figure><img src="tutorial-assets/recovery-size-v412.png" alt="Storage and recovery dialog showing exact RAM snapshot size and limits"><figcaption>Storage status and temporary recovery snapshot. <a href="tutorial-assets/recovery-size-v412.png" target="_blank" rel="noopener">Enlarge screenshot</a></figcaption></figure>
 <div class="guideNote"><strong>Important:</strong> The temporary RAM recovery snapshot excludes imported PDF, DOCX, and TXT manuscript copies. Those are in regular ZIP backups, not emergency RAM recovery. Keep your original manuscript files. The snapshot disappears when the browser reloads, closes, or crashes.</div>
 <p>If the USB drive disconnects or a save fails, <strong>leave the tab open</strong>. Follow the on-screen recovery instructions and save recoverable files to a different location if offered. Some recovery copies may be incomplete. Wait for <strong>Saved</strong> before safely ejecting storage.</p>
 </section>
-<div class="tutorialBottom"><span class="small">Character Bookshelf v4.1.1 · Instructions correspond to this release.</span><span class="small">Return anytime through the footer’s Tutorial link.</span></div>
+<div class="tutorialBottom"><span class="small">Character Bookshelf v4.1.2 · Instructions correspond to this release.</span><span class="small">Return anytime through the footer’s Tutorial link.</span></div>
 </main></div>
 <script>
 (function(){

@@ -62,9 +62,10 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.1.1';
+const APP_VERSION = '4.1.2';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
+  ['4.1.2','Character Development & Manuscript Notes',['Generic arc prompts for new characters; existing profiles keep their original questions and gain a freeform arc-type field','Drag-and-drop import zones for DOCX, PDF, TXT and reviewed character JSON','Manuscript annotations and quote-based relocation, printable margin-note exports for TXT/DOCX','Novel-wide notes, custom character tags and gallery filters','Live RAM recovery usage, inline novel-title editing and desktop button alignment']],
   ['4.1.1','Unified Series Bookshelf',['Linked novels now share ordinary bookshelf rows with standalone novels','Small clickable series labels on linked covers lead straight to the correct Series page','No character, timeline, or novel files are migrated or modified']],
   ['4.1','Series & Manuscript Update',['Writer-level series organization, independently copied characters and deferred relationship links','Combined read-only series timelines with undated events separated','Character mention navigation for DOCX and TXT manuscripts; PDF page viewer retained','Smaller RAM recovery without manuscript copies; writer search index','Optional illustrated, pop-out tutorial with persistent footer access']],
   ['4.0.2','Relationship Color Hotfix',['Fixed an older CSS rule overriding relationship-specific tree line, label, and border colors','Preserved existing tree layout, links, exports, and library data']],
@@ -184,6 +185,7 @@ async function captureRecoverySnapshot() {
   };
   const priority=path=>{
     if(path==='character-archive-manifest.json')return 0;
+    if(path.endsWith('/'+NOVEL_NOTES_FILE)||path.endsWith('/'+ANNOTATIONS_FILE))return 2;
     if(path.endsWith('/novel.json')||path.endsWith('/'+SERIES_FILENAME))return 1;
     if(path.includes('/characters/')&&path.endsWith('.json'))return 2;
     if(path.endsWith('/timeline.json')||path.endsWith('/character-tree.json'))return 3;
@@ -250,6 +252,7 @@ function renderStorageStatus() {
     ['Snapshot details',memoryRecovery.partialReason||'All accessible files captured'],
     ['Last storage error',memoryRecovery.lastFailure||'None']
   ];
+  updateRecoveryMeter();
   host.replaceChildren();
   for(const [label,value] of items){const row=el('div','statusDataRow');row.append(el('strong','',label),el('span','',value));host.append(row);}
 }
@@ -408,7 +411,7 @@ const NAV_KEY = 'character-bookshelf-navigation-v35';
 function pageType() {
   if (!state.root) return 'folder';
   if ($('workspace').classList.contains('hidden')) return 'writers';
-  for (const [id, kind] of [['bookshelfView','bookshelf'],['seriesView','series'],['novelView','characters'],['treeView','tree'],['timelineView','timeline'],['manuscriptView','manuscript'],['librarySearchView','search'],['editor','editor']]) {
+  for (const [id, kind] of [['bookshelfView','bookshelf'],['novelNotesView','novel-notes'],['seriesView','series'],['novelView','characters'],['treeView','tree'],['timelineView','timeline'],['manuscriptView','manuscript'],['librarySearchView','search'],['editor','editor']]) {
     if (!$(id).classList.contains('hidden')) return kind;
   }
   return 'bookshelf';
@@ -1164,10 +1167,11 @@ function blankCharacter(name) {
   return {
     schema: 1, id: randomId(), name, createdAt: now, updatedAt: now, portraitFile: null,
     basic: { fullName: name, age: '', aliases: '', occupation: '', appearance: '', notes: '' },
-    personality: { traits: '', fears: '', beliefs: '', motivations: '', notes: '' },
-    background: { history: '', experiences: '', notes: '' },
+    developmentPrompts: 2, tags: [],
+    personality: { traits: '', fears: '', lie: '', truth: '', want: '', need: '', notes: '' },
+    background: { history: '', experiences: '', formativeExperience: '', startingCircumstances: '', notes: '' },
     relationships: { links: [], notes: '' },
-    story: { role: '', timeline: '', events: '', notes: '' },
+    story: { role: '', timeline: '', events: '', arcType: '', notes: '' },
     freeform: { notes: '' }
   };
 }
@@ -1211,7 +1215,7 @@ function renderCharacterList() {
 }
 function hideMainViews() {
   if(!$('manuscriptView').classList.contains('hidden'))releaseManuscriptResources();
-  for (const id of ['bookshelfView', 'seriesView', 'novelView', 'treeView', 'timelineView', 'librarySearchView', 'manuscriptView', 'emptyView', 'editor']) $(id).classList.add('hidden');
+  for (const id of ['bookshelfView', 'novelNotesView', 'seriesView', 'novelView', 'treeView', 'timelineView', 'librarySearchView', 'manuscriptView', 'emptyView', 'editor']) $(id).classList.add('hidden');
 }
 function cleanGalleryUrls() {
   for (const url of state.galleryUrls) URL.revokeObjectURL(url);
@@ -1329,7 +1333,7 @@ async function showCharacters() {
   }
   const epoch = state.epoch;
   for (const character of sortedCharacters) {
-    const tile = el('div','characterTile');
+    const tile = el('div','characterTile');tile.dataset.characterId=character.id;
     const button = el('button','characterCard'); button.type='button';
     const frame = el('span','galleryPortrait');
     frame.append(el('span','gallerySilhouette','♟'));
@@ -1411,6 +1415,15 @@ const sections = [
   { key: 'story', title: 'Story Information', fields: [['role','Role in the story'],['timeline','Timeline',true],['events','Important events',true]] },
   { key: 'freeform', title: 'Freeform Notes', fields: [] }
 ];
+// New profiles use generic arc questions; earlier profiles retain their prompts unchanged.
+function characterSectionFields(section,character){
+  if(character.developmentPrompts===2 && section.key==='personality')
+    return [['traits','Personality traits',true],['fears','Fears',true],['lie','The Lie — what false belief does this character hold?',true],['truth','The Truth — what challenges that belief?',true],['want','The Want — what does this character want?',true],['need','The Need — what do they actually need?',true]];
+  if(character.developmentPrompts===2 && section.key==='background')
+    return [['history','Personal history',true],['formativeExperience','Formative experience — what shaped their beliefs?',true],['startingCircumstances','Starting circumstances — what is their life like at the beginning?',true]];
+  if(section.key==='story')return [...section.fields,['arcType','Character arc type (optional; your own terminology)']];
+  return section.fields;
+}
 let fieldSerial = 0;
 function makeField(label, value, update, long = false, undoInfo = null) {
   const container = el('div', 'field' + (long ? ' wide' : ''));
@@ -1491,9 +1504,10 @@ function renderEditor() {
     details.id = 'section-' + section.key;
     const summary = el('summary'); summary.append(el('span','',section.title),el('span','', '⌄'));
     const body = el('div','sectionBody');
-    if (section.fields.length) {
+    const displayFields=characterSectionFields(section,character);
+    if (displayFields.length) {
       const grid = el('div','fields');
-      for (const [key, label, long] of section.fields) {
+      for (const [key, label, long] of displayFields) {
         const fieldRow=makeField(label, character[section.key][key] || '', value => {
           character[section.key][key] = value;
           if (section.key === 'basic' && key === 'fullName') {
@@ -1508,6 +1522,7 @@ function renderEditor() {
       }
       body.append(grid);
     }
+    if (section.key === 'basic') renderCharacterTagEditor(body,character);
     if (section.key === 'relationships') renderRelationships(body, character);
     if (section.key === 'story') renderCharacterTimelineEvents(body, character);
     const notes = el('div','notes');
@@ -2536,6 +2551,7 @@ function matchWholeWord(value,query){
 }
 function collectSearchableParts(profile,lookup){
   const parts=[{label:'Character name',value:profile.name,section:'basic',key:'fullName',priority:0}];
+  if(Array.isArray(profile.tags))for(const tag of profile.tags)if(typeof tag==='string')parts.push({label:'Character tag',value:tag,section:'basic',key:'tags',priority:1});
   for(const section of sections){
     const object=profile[section.key]||{};
     for(const [key,value] of Object.entries(object)){
@@ -2584,7 +2600,8 @@ async function loadSearchIndex(){
     }
     const lookup=new Map(profiles.map(p=>[p.id,p.name]));
     const events=await loadTimelineEvents(dir);
-    books.push({novel,profiles,lookup,events});
+    const novelNotes=await readNovelNotesForSearch(dir);
+    books.push({novel,profiles,lookup,events,novelNotes});
   }
   if(writerId!==state.writer?.id||epoch!==state.searchIndexEpoch)return null;
   const index={writerId,at:Date.now(),books};state.searchIndex=index;return index;
@@ -2594,18 +2611,19 @@ async function runLibrarySearch(){
   const host=$('searchResults');host.replaceChildren();
   if(!text){host.append(el('p','muted','Enter a word or phrase to search this writer’s library.'));return;}
   const token=++state.searchEpoch,writerId=state.writer?.id;
-  host.append(el('p','muted','Searching character profiles, relationships, books, and timelines…'));
+  host.append(el('p','muted','Searching character profiles, tags, novel notes, books, and timelines…'));
   const matches=[];
   try{
     const index=await loadSearchIndex();
     if(!index || writerId!==state.writer?.id) return;
-    for(const {novel,profiles,lookup,events} of index.books){
+    for(const {novel,profiles,lookup,events,novelNotes=[]} of index.books){
       const titleAt=matchWholeWord(novel.name,text);
       if(titleAt>=0)matches.push({kind:'book',novel,match:{label:'Novel title',value:novel.name,priority:0,at:titleAt}});
       for(const profile of profiles){
         const hits=collectSearchableParts(profile,lookup).map(part=>({...part,at:matchWholeWord(part.value,text)})).filter(part=>part.at>=0).sort((a,b)=>a.priority-b.priority);
         if(hits.length)matches.push({kind:'character',novel,profile,match:hits[0]});
       }
+      for(const note of novelNotes){const at=matchWholeWord(note.text,text);if(at>=0)matches.push({kind:'novel-note',novel,note,match:{label:'Novel note',value:note.text,priority:3,at}});}
       for(const event of events){
         const fields=[['Event title',event.title,'title',1],['Event notes',event.notes,'notes',3],['Event date',event.dateText,'dateText',3]];
         for(const [label,value,key,priority] of fields){
@@ -2626,7 +2644,7 @@ async function runLibrarySearch(){
       const group=el('section','searchResultGroup');group.append(el('h3','',results[0].novel.name));
       for(const result of results){
         const button=el('button','searchHit');button.type='button';
-        button.append(el('strong','',result.kind==='book'?result.novel.name:result.kind==='event'?result.event.title:result.profile.name));
+        button.append(el('strong','',result.kind==='book'?result.novel.name:result.kind==='event'?result.event.title:result.kind==='novel-note'?'Novel note':result.profile.name));
         button.append(el('span','muted',result.match.label));
         const excerpt=el('span','searchExcerpt');
         const value=String(result.match.value||''),at=result.match.at;
@@ -2641,6 +2659,8 @@ async function runLibrarySearch(){
           if(result.kind==='character'){
             await chooseCharacter(result.profile.id);
             highlightSearchTarget(result.match,text);
+          }else if(result.kind==='novel-note'){
+            await showNovelNotes();focusNovelNote(result.note.id);
           }else{
             await showTimeline();openTimelineEventDialog(result.event.id);
             const fieldId={title:'eventTitleInput',notes:'eventNotesInput',dateText:'eventDateInput'}[result.match.key];
@@ -3036,7 +3056,8 @@ function exportLabel(scope) {
 function exportSections(character) {
   return sections.map(section => {
     const data = character[section.key] || {};
-    const entries = section.fields.map(([key,label]) => ({label, value: String(data[key] ?? '').trim()}));
+    const entries = characterSectionFields(section,character).map(([key,label]) => ({label, value: String(data[key] ?? '').trim()}));
+    if(section.key==='basic' && Array.isArray(character.tags) && character.tags.length)entries.push({label:'Tags',value:character.tags.join(', ')});
     if (section.key === 'relationships') {
       for (const link of relatedCharacters(character)) {
         const target = state.characters.find(c => c.id === link.id);
@@ -3225,10 +3246,10 @@ let pendingImport = null;
 const IMPORT_MAX_BYTES = 1024 * 1024;
 const IMPORT_FIELDS = [
   ['basic','Basic Information', [['fullName','Full name'],['age','Age / ages'],['aliases','Aliases & nicknames (comma-separated)',true],['occupation','Occupation'],['appearance','Physical appearance'],['notes','Additional notes']]],
-  ['personality','Personality', [['traits','Personality traits'],['fears','Fears'],['beliefs','Beliefs'],['motivations','Motivations'],['notes','Additional notes']]],
-  ['background','Background', [['history','Personal history'],['experiences','Significant experiences'],['notes','Additional notes']]],
+  ['personality','Personality', [['traits','Personality traits'],['fears','Fears'],['beliefs','Beliefs'],['motivations','Motivations'],['lie','The Lie'],['truth','The Truth'],['want','The Want'],['need','The Need'],['notes','Additional notes']]],
+  ['background','Background', [['history','Personal history'],['experiences','Significant experiences'],['formativeExperience','Formative experience'],['startingCircumstances','Starting circumstances'],['notes','Additional notes']]],
   ['relationships','Relationships', [['notes','Relationship notes']]],
-  ['story','Story Information', [['role','Role in story'],['timeline','Timeline'],['events','Important events'],['notes','Additional notes']]],
+  ['story','Story Information', [['role','Role in story'],['timeline','Timeline'],['events','Important events'],['arcType','Character arc type'],['notes','Additional notes']]],
   ['freeform','Freeform Notes', [['notes','Notes']]]
 ];
 const importFieldsArePlainObject = val => val !== null && typeof val === 'object' && !Array.isArray(val);
@@ -3405,6 +3426,8 @@ function openImportedNewEditor() {
   if (!pendingImport) return;
   pendingImport.mode='new';
   const parsed=pendingImport.parsed,draft=blankCharacter(parsed.name);
+  // An imported legacy profile must keep its older prompts visible after saving.
+  if(['beliefs','motivations'].some(k=>Object.hasOwn(parsed.fields.personality||{},k)) || Object.hasOwn(parsed.fields.background||{},'experiences'))draft.developmentPrompts=1;
   for (const [section,,keys] of IMPORT_FIELDS) for(const [key] of keys) {
     if (Object.hasOwn(parsed.fields[section]||{},key)) draft[section][key]=parsed.fields[section][key];
   }

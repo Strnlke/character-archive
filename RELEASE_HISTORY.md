@@ -1,5 +1,16 @@
 # Character Bookshelf — Release History
 
+## v4.1.2 — Character Development & Manuscript Notes
+
+- General Lie/Truth/Want/Need prompts for newly created profiles; older profiles retain historical questions, with a freeform arc type for all.
+- Drag-and-drop imports for manuscripts and character JSON, retaining existing confirmations and duplicate reviews.
+- Current RAM recovery size in the save-status toolbar.
+- Passage and chapter/page manuscript notes stored separately, conservative reattachment after revisions, and TXT/DOCX printable margin-note export (PDF imports have notes-only export limitation).
+- Novel-wide notes, searchable across the writer library, and optional character tags with gallery filters.
+- Inline book-title editing and desktop action-button alignment polish.
+- Illustrated tutorial updated for this release; mobile redesign remains separate.
+
+
 ## v4.1.1 — Unified Bookshelf Series Links
 
 - Removed dedicated bookshelf rows and headings for series.

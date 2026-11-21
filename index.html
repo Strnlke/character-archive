@@ -5,16 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1018">
   <title>Character Bookshelf</title>
-  <link rel="stylesheet" href="styles.css?v=4.1.1">
-  <script src="app.js?v=4.1.1" defer></script>
-  <script src="series-v41.js?v=4.1.1" defer></script>
-  <script src="manuscript-v41.js?v=4.1.1" defer></script>
+  <link rel="stylesheet" href="styles.css?v=4.1.2">
+  <script src="app.js?v=4.1.2" defer></script>
+  <script src="series-v41.js?v=4.1.2" defer></script>
+  <script src="manuscript-v41.js?v=4.1.2" defer></script>
+  <script src="features-v412.js?v=4.1.2" defer></script>
 </head>
 <body>
   <header class="topbar">
     <button class="brand brandHome" id="brandHomeBtn" type="button" title="Return to Bookshelf" aria-label="Return to the current writer’s bookshelf"><span class="brand-icon">✦</span><span class="brandWords"><strong>Character Bookshelf</strong><small>Your writing library</small></span></button>
     <div class="topactions">
-      <span id="saveStatus" class="status" role="status" aria-live="polite">No folder selected</span>
+      <span id="saveStatus" class="status" role="status" aria-live="polite">No folder selected</span><span id="recoveryMeter" class="recoveryMeter hidden" title="Temporary RAM recovery snapshot usage"></span>
       <button id="storageStatusBtn" class="quiet hidden" type="button" title="View connection, snapshot, and pending saves">◉ Storage status</button>
       <button id="globalSearchBtn" type="button" class="quiet hidden">⌕ Search library</button>
       <button id="refreshViewBtn" type="button" class="quiet hidden" title="Reload this view from your USB folder without starting over">↻ Refresh view</button>
@@ -136,7 +137,7 @@
         <div class="pageKicker" id="novelViewKicker">NOVEL</div>
         <div class="novelHeading">
           <div>
-            <h1 id="novelViewTitle">Novel</h1>
+            <div id="novelTitleControl" class="novelTitleControl"><button id="novelTitleEditBtn" class="novelTitleEditBtn" type="button" title="Edit this novel title"><h1 id="novelViewTitle">Novel</h1><span class="editPencil" aria-hidden="true">✎</span></button><form id="novelTitleEditForm" class="novelTitleEditForm hidden"><input id="novelTitleInput" type="text" maxlength="160" aria-label="New novel title" required><button type="submit" class="primary">Save</button><button type="button" id="novelTitleCancel" class="quiet">Cancel</button></form></div>
             <p id="novelViewSubtitle">Your characters</p>
           </div>
           <div class="novelActions">
@@ -148,8 +149,13 @@
             <button id="novelViewNewCharacterBtn" class="primary" type="button">＋ New character</button>
           </div>
         </div>
-        <div class="collectionHeading"><h2>Characters</h2><label class="gallerySortLabel" for="gallerySort">Sort <select id="gallerySort"><option value="name">Name (A–Z)</option><option value="newest">Recently created</option><option value="updated">Recently updated</option></select></label><button id="novelTreeBtn" class="treeNavButton" type="button">♧ Character tree</button><button id="novelTimelineBtn" class="treeNavButton" type="button">▦ Timeline</button><button id="novelManuscriptBtn" class="treeNavButton" type="button">▤ Manuscript</button><span id="novelCharacterCount" class="count">0</span><div class="spacer"></div><button id="exportPdfNovelBtn" class="quiet" type="button">↓ Export PDF</button><button id="exportDocxNovelBtn" class="quiet" type="button">↓ Export Word</button></div>
-        <div id="characterGallery" class="characterGallery"></div>
+        <div class="collectionHeading"><h2>Characters</h2><label class="gallerySortLabel" for="gallerySort">Sort <select id="gallerySort"><option value="name">Name (A–Z)</option><option value="newest">Recently created</option><option value="updated">Recently updated</option></select></label><button id="novelTreeBtn" class="treeNavButton" type="button">♧ Character tree</button><button id="novelTimelineBtn" class="treeNavButton" type="button">▦ Timeline</button><button id="novelManuscriptBtn" class="treeNavButton" type="button">▤ Manuscript</button><button id="novelNotesBtn" class="treeNavButton" type="button">✎ Novel notes</button><span id="novelCharacterCount" class="count">0</span><div class="spacer"></div><button id="exportPdfNovelBtn" class="quiet" type="button">↓ Export PDF</button><button id="exportDocxNovelBtn" class="quiet" type="button">↓ Export Word</button></div>
+        <div class="characterTagFilter"><label for="galleryTagFilter">Filter by tag</label><select id="galleryTagFilter"><option value="">All characters</option></select></div><div id="characterDropZone" class="fileDropZone smallFileDropZone" role="group" aria-label="Drop a character JSON file"><strong>Drop character JSON here</strong><span>Or select Import character above · review before saving</span></div><div id="characterGallery" class="characterGallery"></div>
+      </section>
+      <section id="novelNotesView" class="novelNotesView hidden" aria-labelledby="novelNotesTitle">
+        <nav class="profileNav"><button id="notesBackBtn" class="textButton" type="button">All characters</button><span class="navSep">/</span><span class="navNow" aria-current="page">Novel Notes</span></nav>
+        <div class="notesHeading"><div><p class="pageKicker">NOVEL WORKSPACE</p><h1 id="novelNotesTitle">Novel Notes</h1><p class="muted">General notes for this novel. Stored separately from your manuscript and character profiles.</p></div><button type="button" id="newNovelNoteBtn" class="primary">＋ Add note</button></div>
+        <div id="novelNotesList" class="novelNotesList"></div>
       </section>
       <section id="treeView" class="treeView hidden" aria-labelledby="treeViewTitle">
         <div class="treeBreadcrumb">
@@ -190,6 +196,7 @@
       <section id="manuscriptView" class="manuscriptView hidden" aria-labelledby="manuscriptTitle">
         <nav class="profileNav" aria-label="Manuscript navigation"><button id="manuscriptShelfBtn" class="textButton" type="button">Bookshelf</button><span class="navSep">/</span><button id="manuscriptNovelBtn" class="textButton" type="button">All characters</button><span class="navSep">/</span><span class="navNow" aria-current="page">Manuscript</span></nav>
         <div class="manuscriptHeading"><div><p class="pageKicker">NOVEL REFERENCE · READ ONLY</p><h1 id="manuscriptTitle">Manuscript</h1><p id="manuscriptDescription" class="muted">Read an imported copy. Your working draft stays untouched.</p></div><div class="manuscriptActions"><label class="quiet fileLabel" for="manuscriptFileInput" id="manuscriptImportLabel">↑ Import manuscript</label><input id="manuscriptFileInput" type="file" accept=".docx,.pdf,.txt,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden><button id="manuscriptRemoveBtn" type="button" class="dangerOutline hidden">Remove copy</button></div></div>
+        <div id="manuscriptDropZone" class="fileDropZone" role="group" aria-label="Drop manuscript PDF, Word, or text file"><strong>Drop a manuscript here</strong><span>PDF · DOCX · TXT — or use the Import manuscript button above</span></div>
         <div id="manuscriptEmpty" class="manuscriptEmpty"><div class="bigGlyph">▤</div><h2>No manuscript imported</h2><p>Import a DOCX, PDF, or TXT file to read a separate copy within this novel. Your original remains unchanged.</p><label class="primary fileLabel" for="manuscriptFileInput">↑ Import manuscript</label></div>
         <div id="manuscriptReady" class="manuscriptReady hidden">
           <div class="manuscriptFileInfo"><div><strong id="manuscriptFileName"></strong><span id="manuscriptFileDetails" class="muted"></span></div><span class="readOnlyPill">◈ Read only</span></div>
@@ -207,6 +214,11 @@
             <div class="manuscriptMatchesHeading"><strong id="manuscriptMatchCounter">Select a character</strong><div><button id="manuscriptPrevMatch" type="button" class="quiet" disabled aria-label="Previous mention">↑</button><button id="manuscriptNextMatch" type="button" class="quiet" disabled aria-label="Next mention">↓</button></div></div>
             <div id="manuscriptMentionList" class="manuscriptMentionList"></div>
           </aside></div>
+          <section id="annotationPanel" class="annotationPanel" aria-label="Manuscript notes">
+            <div class="annotationHeading"><h2>Manuscript notes</h2><div><button id="addPassageNote" class="quiet" type="button">＋ Passage note</button><button id="addChapterNote" class="quiet" type="button">＋ Chapter / page note</button><button id="exportAnnotatedBtn" class="quiet" type="button">↓ Export annotated PDF</button></div></div>
+            <p class="muted" id="annotationHint">Select text in the manuscript to attach a passage note, or create a chapter note. Notes never modify the source document.</p>
+            <div id="annotationList" class="annotationList"></div>
+          </section>
           <div id="manuscriptReaderStatus" class="readerStatus" role="status"></div>
         </div>
       </section>
@@ -328,6 +340,7 @@
       <p class="helper">The dragged card returns to its original position so cards don't overlap. Connections save to the USB folder.</p>
     </div>
   </dialog>
+  <dialog id="annotationEditDialog" class="backupDialog" aria-labelledby="annotationDialogTitle"><form id="annotationEditForm" class="dialogBody"><h2 id="annotationDialogTitle">Add manuscript note</h2><p id="annotationAnchorPreview" class="helper"></p><label for="annotationTextInput">Your note</label><textarea id="annotationTextInput" rows="5" maxlength="30000" required></textarea><div class="dialogActions"><button type="button" id="annotationCancel" class="quiet">Cancel</button><button type="submit" class="primary">Save note</button></div></form></dialog>
   <dialog id="timelineEventDialog" class="timelineEventDialog" aria-labelledby="timelineDialogHeading">
     <form id="timelineEventForm" class="dialogBody">
       <h2 id="timelineDialogHeading">Add Timeline Event</h2>
@@ -369,7 +382,7 @@
   <dialog id="revisionHistoryDialog" class="revisionHistoryDialog" aria-labelledby="revisionHistoryHeading"><div class="dialogBody"><h2 id="revisionHistoryHeading">Character Revision History</h2><p class="helper">Saved snapshots from earlier editing sessions. Restoring a revision first backs up your current profile.</p><div id="revisionHistoryList" class="revisionHistoryList"></div><div class="dialogActions"><button id="closeRevisionsBtn" type="button" class="quiet">Close</button></div></div></dialog>
   <footer class="appFooter" id="appFooter">
     <div class="footerBrand"><span class="footerSymbol" aria-hidden="true">✦</span> Character Bookshelf</div>
-    <div class="footerLinks"><button id="footerStorageBtn" type="button" class="footerLink">Storage status</button><button id="releaseNotesBtn" type="button" class="footerLink">Release notes</button><button id="footerTutorialBtn" type="button" class="footerLink">Tutorial</button><span id="footerVersion" class="footerVersion">v4.1.1</span></div>
+    <div class="footerLinks"><button id="footerStorageBtn" type="button" class="footerLink">Storage status</button><button id="releaseNotesBtn" type="button" class="footerLink">Release notes</button><button id="footerTutorialBtn" type="button" class="footerLink">Tutorial</button><span id="footerVersion" class="footerVersion">v4.1.2</span></div>
   </footer>
   <dialog id="tutorialDialog" class="tutorialDialog" aria-labelledby="tutorialDialogTitle">
     <div class="tutorialDialogBar"><strong id="tutorialDialogTitle">Getting Started · Character Bookshelf</strong><div><button id="tutorialPopBtn" type="button" class="quiet">↗ Pop out</button><button id="tutorialCloseBtn" type="button" class="primary">Close</button></div></div>

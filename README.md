@@ -1,48 +1,38 @@
-# Character Bookshelf v4.1.1 — Unified Bookshelf Patch
+# Character Bookshelf v4.1.2 — Character Development & Manuscript Notes
 
-Character Bookshelf is a locally stored writing-reference application for writer profiles, novels, characters, relationship trees, structured timelines, manuscript reference copies, and writer backups. The library remains in a folder you explicitly authorize (typically a USB flash drive). The application does not synchronize your records to a cloud account.
+Character Bookshelf is a local writing-reference web app. Data remains in the browser-authorized folder (usually a USB drive); there is no automatic cloud sync. This package upgrades the tested v4.1.1 source without moving or renaming a user's existing library folders.
 
-## Install / upgrade from v4.1 or v4.0.2
+## Install and rollback safely
 
-1. **Export a writer ZIP backup and separately copy your entire existing Character Bookshelf USB folder.** Verify that your originals are safely retained before testing an update.
-2. Extract this ZIP. In your GitHub repository's existing `character-archive` Pages root, replace **`index.html`, `app.js`, `styles.css`, `series-v41.js`, `manuscript-v41.js`, `tutorial.html`**, and the **entire `tutorial-assets/` folder**. Keep those filenames and directories exactly as supplied; all assets are local and load alongside `index.html`.
-3. Commit and allow GitHub Pages to deploy, then refresh the page when no edits are pending. The HTML requests versioned `?v=4.1.1` JS and CSS assets to help avoid stale browser cache.
-4. Open your usual USB library. Start with a **copied test library** or a disposable writer before opening important work. Check the storage-status panel and verify at least one normal save and writer ZIP backup.
-5. Leave your prior working source files (v4.1 or v4.0.2) available as a rollback option. **Do not restore an older source while unsaved edits are pending.**
+1. **Back up the working library first.** Export a writer ZIP and copy the entire USB folder to independent storage. Keep the known-working v4.1.1 website release ZIP.
+2. Extract the entire v4.1.2 ZIP and upload all supplied application files to your existing GitHub Pages repository. In addition to the prior files, **`features-v412.js` is new and required**. Replace the complete `tutorial-assets/` directory as well.
+3. Commit and refresh the page after the new files deploy. HTML references `?v=4.1.2` to avoid stale cached JS/CSS.
+4. **Test with a disposable copy of the library first**: open a novel, make a character edit, save and restore a ZIP, then import a sample manuscript and add a note. Only use the real library when the site's behavior is verified.
+5. For a code rollback, restore all files from the v4.1.1 ZIP together. v4.1.1 will ignore newer sidecar note files and newly added fields, rather than deleting them. It will *not* show or edit v4.1.2-only data. Back up all data before switching versions.
 
-**Supported for USB-folder access:** recent desktop Chrome and Edge using HTTPS (e.g., GitHub Pages) or localhost and their File System Access API. Other browsers may not support the same folder authorization workflow. The reader is responsive, but browser file-system permissions and pop-out window behaviors vary by platform.
+## The six new feature areas
 
-## Five feature areas
+**1. Character prompts and freeform arcs.** Newly created profiles receive general-purpose Lie, Truth, Want, Need, Formative Experience and Starting Circumstances prompts. Existing characters keep their previous Beliefs, Motivations and Significant Experiences fields. Both receive an optional, blank Character Arc Type field; the app supplies no arc-method descriptions. Imported legacy JSON continues to use its historical prompts to avoid hiding imported answers.
 
-**1. Character mentions while reading manuscripts.** An additional character sidebar in the read-only TXT and DOCX viewer lists **all characters from that book**, including zero-match profiles. Choose a character to view grouped mentions, their context, and next/previous navigation; click a mention to jump and highlight. Searches match whole words and user-entered **Aliases & nicknames** (Basic Information). The existing native **PDF viewer still works**, but character mention counts/jumps/highlights **are not yet available for PDF**, because browser-native PDF text cannot reliably be queried by this app.
+**2. Drag-and-drop imports.** Import manuscripts by dropping PDF, DOCX or TXT into the Manuscript page, or use the original file picker. Drag character JSON onto the Character Gallery or use Import Character. Both routes call the same existing validation, replacement confirmation, comparison and duplicate-review workflows. Only one file is accepted per drop.
 
-**2. Smaller volatile RAM recovery.** Imported manuscript reference files (PDF, DOCX and TXT) are intentionally omitted from the emergency RAM snapshot, leaving more memory for irreplaceable character and novel information. Essential JSON data is prioritized. This temporary snapshot is cleared by reload, browser close or crash. **Normal exported writer ZIPs STILL INCLUDE manuscripts.** The source manuscripts should also be stored independently. Old imported files are not silently deleted when the application cannot confirm that they're an unchanged reference copy.
+**3. RAM snapshot size.** A compact indicator in the top bar displays current volatile RAM snapshot use (MiB / 384 MiB). Storage Status continues showing detailed counts, completeness and errors. Manuscript reference copies remain excluded from RAM recovery.
 
-**3. Illustrated, optional tutorial.** Select **Getting Started Tutorial** on the writer selection screen after selecting a storage location, or **Tutorial** in the footer from any application page. The full text-and-screenshot guide has nine clickable subjects, enlarged-image links, and a **Pop out** button for side-by-side practice. Nothing launches automatically. The guide is release-specific and should be updated with subsequent feature releases.
+**4. Manuscript annotations and printable export.** Save Passage Notes anchored to selected TXT/DOCX text (one paragraph at a time), or Chapter Notes. PDFs support manually identified page notes. Notes are stored in `manuscript-annotations.json` in the novel folder and never modify a source manuscript. When the manuscript is replaced, matching uses selected text, context and chapter; ambiguous matches require review and missing passages stay unlinked. TXT/DOCX annotated exports open a printable copy with notes alongside paragraphs; select Print → Save as PDF in the browser. **For PDF imports, the current native browser viewer cannot print original PDF pages with side annotations; this version provides a separate notes-only print report, not a merged annotated PDF.** Never rely on passage matching to be perfect after heavy revisions; inspect proposed matches.
 
-**4. Cached, writer-specific search index.** Repeated library searches use a temporary in-memory index rather than re-reading each character JSON file on every query. The index is invalidated on tracked saves and Refresh View, and also ages out (90 seconds) to limit stale results after external edits. Exact whole-word search behavior and result navigation remain intact.
+**5. Novel-wide notes.** A Novel Notes page (from the character gallery) stores freeform notes in `novel-notes.json` for each novel. Notes are indexed by writer-wide search. Use Save Changes to commit edits. Concurrent external edits are detected instead of overwritten.
 
-**5. Linked novel Series.** Create an optional named series and link existing books; use arrows to order them. Linked covers are placed next to one another on the bookshelf. The Series page combines existing per-novel timelines without duplicating event records. Entries without an explicit year/date remain in **Undated / relative events**, labeled with their source book. **Copy character** creates a new independent profile/portrait in another linked book. Relationship references are deferred until both copied endpoints exist; then they resolve to the new IDs. Once established, each book's character edits and relationships remain independent. A manually deleted copied relationship is not auto-recreated. A character already copied from the exact source book is detected; similarly named but unrelated profiles require user confirmation.
+**6. Character tags and gallery filtering.** Add optional comma-separated tags in Basic Information. Filter the novel's character gallery by tag; tags are included in character data, character exports, writer-wide search and backups.
 
-## Storage, compatibility, and known limits
+**Also:** Click a book title on its Characters page to rename it in place, without changing its ID/folder/series position. Consistent desktop alignment for the Series/New Novel and novel action buttons. The mobile redesign is deliberately **not included** in this release.
 
-- **No library migration is needed.** Existing novel, timeline and character files retain their formats; optional series data is stored as `character-bookshelf-series.json` in each writer's folder. Copied character profiles can add provenance and pending-link fields; existing profiles are not mass-modified.
-- Writer ZIP backups include series metadata and imported manuscripts. Emergency RAM snapshots exclude manuscript bytes. Recovery never replaces a permanent, independently stored backup.
-- Complex DOCX layout may not reproduce precisely. PDF character mention indexing remains unavailable in v4.1; PDF page navigation stays with the native viewer.
-- Series timelines use explicitly entered years or parseable absolute dates. They never guess a year from relative descriptions. Undated items are identified by source book.
-- The initial character index for a huge writer library still needs a scan; repeated searches benefit most. Indexes are volatile and intentionally temporary.
-- Browser pop-up blockers may require allowing the tutorial pop-out on your GitHub Pages site.
-- Source files are unminified. The existing bundled JSZip notices are retained in `app.js` and `THIRD_PARTY_LICENSES.md`.
+## Safety and known limitations
 
-## Verification
+- Novel and annotation JSON sidecars are included automatically in writer ZIP backups and the RAM snapshot. Imported PDF/DOCX/TXT manuscript bytes remain excluded from RAM recovery. The snapshot disappears when the browser closes or reloads.
+- Notes anchor conservatively to text. Repeated passages and major rewrites may need manual reattachment. PDF page notes require manual review if pagination changes. DOCX text rendering does not preserve all complex Word formatting or graphics.
+- DOCX/TXT margin-note export relies on the browser Print → Save as PDF workflow; it is not a separately generated PDF download. Pop-up blockers can prevent the print window; allow pop-ups for the Pages site.
+- Character JSON import reviews remain manual, and the writer's selected folder is the only source of truth.
+- Browser filesystem permissions depend on the browser; test physical USB access independently. Desktop layout has been regression-tested; a larger mobile interface redesign is reserved for a separate release.
+- The bundled JSZip library retains its MIT notices in `app.js` and `THIRD_PARTY_LICENSES.md`.
 
-See **`QA_REPORT.md`** for test scope, results, and environment limits. This release was tested in a disposable simulated Chromium USB file system; it was **not** tested against your real flash drive or the deployed GitHub Pages site. Preserve a separate backup and verify a few test saves before using it for unrecoverable work.
-
-See **`RELEASE_HISTORY.md`** for earlier releases.
-
-## v4.1.1 bookshelf refinement
-
-Linked novels appear on the **same regular bookshelf rows** as all other novels,
-next to their series companions. There are no separate series-only shelves.
-A small ◇ series label on each linked book opens that series directly.
-Standalone books are displayed normally. No library-data migration is needed.
+See `QA_REPORT.md` for what was and was not tested, `RELEASE_HISTORY.md` for older releases, and the **Tutorial** footer link inside the application for step-by-step screenshots.

@@ -1,56 +1,37 @@
-# Character Bookshelf v4.1.1 — QA Report
+# Character Bookshelf v4.1.2 — Stability and Release QA
 
-## Automated results
+## Result
 
-**64 / 64 scenario checks passed** in a Chromium browser harness using disposable, simulated File System Access API folders. No unhandled browser JavaScript errors were observed in the tested paths.
+**39/39 checks passed in an isolated Chromium browser simulation** with **zero uncaught JavaScript errors** in that suite. JavaScript syntax checks passed for all four source scripts. The tutorial has **11 functional navigation topics** and **11 verified screenshot references**; its topic navigation was exercised at desktop and phone-sized viewport widths.
 
-| Suite | Result | Main focus |
-| --- | ---: | --- |
-| v4.1 integration suite | **28 / 28** | Novel series, independent character copying, deferred tree links, explicit dates and undated timeline events, alias-based manuscript matching, RAM exclusions, search cache, tutorial controls, writer ZIP backup |
-| v4.0.2 regression suite | **22 / 22** | Startup, writer and novel navigation, relationship colors, whole-word search, autosave, TXT/DOCX/PDF importing, ZIP export, simulated emergency recovery |
-| Adverse-condition suite | **10 / 10** | Writer-deletion guard, malformed and canceled character imports, reviewed updates, external write conflict, failed-save readback, canceled and completed backup restore |
-| Scale suite | **4 / 4** | 503-character gallery, 500-result whole-word search, shelf navigation, no JS errors |
+This is a meaningful functional test result, **not certification of zero bugs**. The browser environment blocked requests to local test URLs, so the automated suite loaded the same release HTML/CSS/JS into an isolated page with in-memory substitutes for the browser's local file handles. The deployed GitHub Pages site, production USB flash drives, real-world storage permission prompts, complex DOCX files, multi-hundred-page PDFs, printing on all browsers, and Android devices **were not tested for this release**.
 
-**Scale observations:** 503-character gallery loaded in approximately **1.28 seconds**; searching the generated 500-match data took approximately **1.22 seconds** in this particular simulated Chromium run. These are not benchmarks of a physical USB flash drive.
+## Checks performed
 
-## Illustrated tutorial verification
+- Legacy novel and character data still open; original Beliefs prompts remain on existing characters. New characters get Lie, Truth, Want, Need and starting-circumstances fields. Both kinds receive a freeform arc field.
+- Novel title changes in place while retaining the existing storage-folder name.
+- Desktop novel action buttons align; novel data remains accessible.
+- General novel notes save as standalone JSON; note edits are guarded against external file conflicts; writer-wide search finds note content.
+- Character tags save, appear as available filter choices, and filter the gallery correctly.
+- DOCX/TXT passage and chapter notes save with location metadata, survive a manuscript replacement, relocate when exact unique text moves, and become safely unlinked when source text disappears.
+- Ambiguous repeated text is flagged for review, not silently reattached to an arbitrary occurrence.
+- Native PDF notes support page anchoring and a truthful **notes-only** printable report; no false claim is made that original PDF pages are embedded in it.
+- TXT/DOCX annotated print export opens a separate printable document containing manuscript paragraphs and side notes, without altering the original stored manuscript.
+- Dragged-in manuscripts use the existing replacement flow. Dragged-in character JSON opens the existing compare/review flow, and cancel leaves the character count unchanged.
+- The RAM recovery snapshot contains note JSON but excludes imported manuscript-reference bytes.
+- No uncaught JavaScript errors during the primary 39-test sequence.
+- Tutorial topic links worked in isolated Chromium at desktop and narrow viewport widths. All screenshot files referenced by the tutorial exist.
 
-All **eight** referenced screenshot assets exist; images loaded with their expected dimensions in the isolated browser test. All nine navigation targets are present; tested clicking Getting Started, Timelines, Novel Series, Manuscript Reader and Backups & Recovery. No tutorial script exceptions or unintended horizontal page overflow were observed at a 390-pixel viewport. The tutorial includes a pop-out control, but **real browser pop-up permission** remains an end-user environment check.
+## Known limitations / release cautions
 
-## Data integrity checks
+1. **Native PDF viewer:** Passage selection and precise in-document highlighting are not available for PDF, and annotated export of actual PDF pages is not supported. PDF manuscripts can have page notes and a separate notes-only print report.
+2. **TXT/DOCX export:** The “Export annotated PDF” action opens a *printable HTML view*, where the writer chooses their browser's **Print → Save as PDF**. It does not automatically produce a PDF file. Pop-up blocking may prevent the new tab.
+3. **Anchor stability:** Automatic reattachment can never guarantee success across substantial rewrites, repeated phrases, or structural differences in extracted DOCX text. The app retains unmatched notes; verify the proposed locations when changing drafts.
+4. **USB and browsers:** The library is controlled by the browser's File System Access permissions. The application was not tested on the user's physical USB drive or on the live hosting domain in this session. Test on disposable folders first, especially backup, recovery, and permission failures.
+5. **Mobile:** Only limited layout smoke checks were performed. A dedicated phone-layout redesign is deliberately excluded from this release and is planned separately so it can be rolled back without losing unrelated features.
+6. **Backwards compatibility:** v4.1.1 will ignore the additional sidecar note files and new character fields, but will not display or edit v4.1.2-only data. Always back up the library before deploying or rolling back. The existing v4.1.1 series/restore test suite was not rerun in full after these additive changes.
+7. **Recovery isn't backup:** The snapshot is volatile, has size and file-count limits, may be partial, and does not retain imported manuscripts. Keep independent writer ZIPs and original writing documents.
 
-- Copying a character to a different linked novel generates a separate profile with a distinct ID. Source profile unchanged.
-- A pending copied relationship becomes a real destination link only after the other character is copied. A manually removed destination relationship remains removed when more characters are copied.
-- A repeated copy of the same provenance is blocked; same-name/unrelated profiles prompt confirmation.
-- Series timeline reads source novels rather than saving duplicate events. Relative/undated events remain in a separate section with their originating book.
-- Imported manuscript bytes stay **out of the emergency RAM snapshot** but **inside ordinary writer ZIP backups**.
-- USB disconnection, an external profile overwrite, and a simulated readback mismatch were covered through the existing regression/failure harness.
+## Release recommendation
 
-## Limits and follow-up
-
-1. Tests used a **simulated USB folder** in headless Chromium and synthetic novels; they are not a certification of physical USB behavior, GitHub Pages deployment, arbitrary devices or other browsers.
-2. **Precise PDF character-mention indexing, highlighting and jump-to-occurrence are not implemented**. The native PDF manuscript reader remains available.
-3. Complex DOCX formatting and very large real manuscripts were not exhaustively tested; the scale run stressed character JSON volumes, not tens of megabytes of full prose.
-4. A read-only manuscript is still valuable data if its original is missing: it is intentionally **excluded from RAM snapshots**, so preserve original files and exported writer ZIPs.
-5. An in-browser RAM snapshot cannot survive browser close/crash. External backups are necessary.
-6. Test a copied library on your actual flash drive after deploying, and verify: normal saves, manual reauthorization, ZIP contents, Series copying, and recovery-to-another-folder.
-
-**Release decision:** Automated acceptance checks passed. Suitable for controlled end-user testing with verified backups; real-hardware and live-host acceptance are still outstanding.
-
-
-## v4.1.1 unified-shelf patch verification
-
-**20 / 20 patch-specific Chromium checks passed** in a disposable, isolated browser page.
-These checks are **additional** to the previous v4.1 release's 64 scenario checks;
-the complete earlier suite was not rerun during this small patch.
-
-Patch tests covered ordinary five-book shelf rows, series-member adjacency, no
-series-only shelf headings, five linked labels across two series, standalone books,
-accessible series button labels, correct navigation to each Series page, ordinary
-novel-cover click behavior, unlinked books, a series longer than five books, and
-successful series-button navigation at a mobile viewport. No uncaught browser JS
-exceptions occurred in those exercised paths.
-
-The tutorial's bookshelf screenshot was recaptured from the modified interface
-using synthetic QA novels. Browser tests used DOM-injected scripts and simulated
-storage; this is not a test on a physical USB drive or the deployed site.
+The package passed its scoped simulated QA and is suitable for **careful testing using a disposable library**. Do not replace a known-good copy or rely on it as the sole repository of notes until the writer ZIP and emergency recovery have been verified on actual hardware. Record any failures and preserve the old release ZIP for rollback.
