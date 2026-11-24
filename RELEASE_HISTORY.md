@@ -1,5 +1,14 @@
 # Release History — Character Bookshelf
 
+## v4.2.5 — Classic Cover Titles & Compact Labels (QA candidate)
+- Restored on-cover titles for generated book covers in standard and compact layouts.
+- Supplementary readable title boxes appear **only** when adaptive cover width is under 150px; standard covers have no separate box.
+- Uploaded cover artwork stays unmodified; the existing full-title hover/focus/long-press preview remains for every book.
+- Spine View continues using vertical, live text, including books with uploaded artwork. Book deletion and series badges stay on the cover rather than the compact label.
+- No map-code, storage, recovery, writer/novel JSON schema, series behavior or imported manuscript changes.
+- 25/25 Node tests and 5 focused Chromium bookshelf cases passed; real-device/live-site acceptance remains outstanding.
+
+
 ## v4.2.4 — Bookshelf Readability & Contextual Stamp Controls (QA candidate)
 - Cover view gains consistent-height readable title ribbons above cover art. Titles truncate after two lines without changing the original cover file; complete title tooltip on hover, keyboard focus or touch long-press.
 - Spine view always uses vertically typeset live text even for books with uploaded cover art. Book-cover content is preserved in the underlying DOM for mode switching and only shown in Cover View.

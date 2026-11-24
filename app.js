@@ -62,9 +62,10 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.2.4';
+const APP_VERSION = '4.2.5';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
+  ['4.2.5','Original Cover Titles & Compact Labels',['Restored titles inside generated book covers in normal and compact cover views','Compact title labels appear only when books scale down; standard covers keep their original appearance','Uploaded cover art is unchanged and spine titles still read vertically','Full-title hover, keyboard-focus and touch previews remain available; no saved-data changes']],
   ['4.2.4','Readable Bookshelf & Contextual Stamp Controls',['Readable title ribbons above covers and full-title hover/focus/long-press previews','Spine titles retain their vertical orientation with uploaded cover artwork','Contextual stamp resize/rotate tools appear only for a selected stamp without changing the map viewport','No map-file migration or change to recovery and backup behavior']],
   ['4.2.3','Map Interaction & Adaptive Bookshelf',['Drag to pan by default; double-click a saved map object to select or edit it','Copy/paste/duplicate map objects with Ctrl+C, Ctrl+V and Ctrl+D; fixed-center reversible resizing','Fit to Screen stays visible without a Select/Pan toolbar mode','Adaptive bookshelf cover density with optional remembered spine view','RAM recovery indicator now uses correctly converted decimal MB units']],
   ['4.2.2','World Maps Startup Hotfix',['Fixed a syntax error that blocked the entire World Maps editor from loading','Added visible startup/connection diagnostics and safer folder-picker behavior','Kept the existing editable map files, storage schema and recovery model unchanged']],
@@ -1363,7 +1364,10 @@ function renderBookshelfCards(mode=bookshelfMode()){
  const geometry=bookshelfGeometry(mode);
  const button=$('bookshelfViewModeBtn');
  if(button){button.textContent=mode==='spines'?'▦ Cover view':'▥ Spine view';button.title=mode==='spines'?'Switch to full book covers':'Switch to compact book spines';button.setAttribute('aria-pressed',String(mode==='spines'));}
- $('bookshelfView').dataset.shelfMode=mode;
+  $('bookshelfView').dataset.shelfMode=mode;
+ // 150px or wider keeps the classic cover. Below that, show a separate readable
+ // title label while retaining the original lettering on the cover itself.
+ $('bookshelfView').dataset.shelfCompact=(mode==='covers' && geometry.width<150)?'true':'false';
  container.style.setProperty('--shelf-card-width',geometry.width+'px');
  container.style.setProperty('--shelf-cover-height',Math.round(geometry.width*1.38)+'px');
  hideBookshelfTooltip();container.replaceChildren();
