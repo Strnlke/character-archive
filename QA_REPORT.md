@@ -1,35 +1,41 @@
-# Character Bookshelf v4.2.3 — QA Report
+# Character Bookshelf v4.2.4 — QA Report
 
-**Report date:** November 24, 2026  
-**Build:** v4.2.3 Map Interaction & Adaptive Bookshelf  
-**Verdict:** Focused automated checks passed. Real-device acceptance pending.
+**Build:** v4.2.4, derived from full v4.2.3 release. **Test date:** November 24, 2026. **Status:** QA candidate; not deployed by developer.
 
-## Scope and method
+## Change scope
+- Cover title ribbons, full-title previews, modest minimum width and original artwork retention.
+- Vertical spine labels with uploaded cover images, regardless of collection size.
+- Selected-stamp-only contextual size/rotation controls in World Maps, with fixed canvas geometry.
+- No changes to original writer/novel/character/series/map schemas, writer data paths, save verification, backup/recovery caps, or copy synchronization rules.
 
-1. **Node map model and interaction tests (20 of 20 passed):** `node --test tests/*.mjs`. Existing map-model tests cover schema invariance, independent map copy, selective merge, image-free recovery and duplicate safety. The startup test checks parse requirements. The new v4.2.3 interaction tests cover annotation cloning/new identity, size/rotation/color retention, stroke-point translation, repeated reversible resizing, shape/text/stamp sizing, and immutable source data.
-2. **Isolated Chromium map UI exercise:** Page assembled in a Playwright `about:blank` frame with equivalent source/markup and in-memory mock local folder handles. Exercise: initialize writer, create blank map, add stamp, native double-click select, Ctrl+C then Ctrl+V, drag empty region to pan, Fit to Screen, create text label, native double-click to edit saved text. No page exceptions observed in this sequence. Found and repaired the intermediate no-op-click DOM rebuild that swallowed native double-click selection.
-3. **Isolated Chromium bookshelf UI exercise:** Rendered 30 fictional novel records in an in-memory writer state. Checked cover and spine modes, shelf counts, responsive geometry and computed spine presentation. No source novel data was changed in this test.
-4. **Static/source checks:** Confirmed release version and asset cache-busting references, HTML/CSS/JS source presence, recovery numerator/denominator conversion, new helper import, absence of the previous Select/Pan toolbar controls.
-
-## Results and evidence
-
-| Test group | Result | Qualification |
+## Verification results
+| Test | Result | Scope / evidence |
 |---|---|---|
-| Node automated tests | 20/20 pass | Pure model/startup/interaction helper tests |
-| Map simulated browser workflow | Pass for exercised actions | Mock storage, `about:blank` inline harness, no USB dialog |
-| Adaptive bookshelf simulated browser workflow | Pass for exercised layout DOM | 30 fictional novels; screenshots not accepted as universal pixel fidelity |
-| Real writer library and live GitHub Pages | Not run | Needs owner acceptance |
-| Real USB/storage disconnect/conflict recovery | Not run | Critical high-risk area, not certified |
-| Android/mobile gesture and export/printing fidelity | Not run end-to-end | Needs physical-device QA |
+| Node test suite (map model, syntax, source assertions, map startup, new UI regressions) | **23/23 passed** | Node v24 runtime, local source; source assertions are not UI interactions |
+| CSS parsing of changed styles | **3/3 files clean** | tinycss2 on `bookshelf-v423.css`, `bookshelf-v424.css`, `world-maps.css` |
+| Simulated Chromium bookshelf: 30 books, 1366×820 | **Pass** | Title ribbons, uploaded-image title elements retained, spine vertical, uploaded image hidden only in spine, hover/focus tooltip; no JS page errors |
+| Simulated Chromium bookshelf: 6 books, 1366×820 | **Pass** | Same checks on small collection |
+| Simulated Chromium bookshelf: 30 books, 740×820 | **Pass** | Narrow viewport, title ribbons, spine vertical, hovered/focused tooltip; no JS page errors |
+| Simulated Chromium map editing | **Pass** | Mock folder picker/digest; new blank map, stamp select/deselect, scale up/down and readout, unchanged viewBox/stage height, copy/paste, pan, Fit, text re-edit, autosave; no JS page errors |
+| PNG/SVG/PDF export and live File System Access | **Not run** | Legacy functions unchanged; user hardware acceptance required |
+| Full physical USB, Android, GitHub Pages deployment | **Not run** | No access to real target or physical device |
+| Full writer ZIP restore, unplugged USB/emergency recovery and complex existing maps | **Not run** | No authoritative claim of end-to-end recovery certification |
 
-## Known limitations / cautions
+## Confirmed observations
+- In simulated bookshelves containing uploaded cover artwork, the live title text remains in each cover DOM and is typeset vertically in Spine View, unlike v4.2.3 when the image replaced it.
+- In the map simulation, selected stamp controls appear only while a stamp is selected, and shrinking immediately after enlarging restores the same displayed scale. Camera viewBox and canvas height did not change when the context strip appeared or its size controls were used.
+- Every test used disposable fictitious books, mock file handles or a synthetic World Map, not the user's original manuscripts or active writing folder.
 
-- Managed browser policy in this environment blocks normal localhost navigation. `about:blank` isolated harness tests are useful **but not equal** to full integrated live deployment.
-- Changing writer bookshelf view persists in the current browser per writer; storage-disabled browsers retain only session preference.
-- Writer ZIP and recovery limits remain those of the v4.2.2 architecture; this release does not expand them.
-- Browser clipboard keyboard shortcuts operate on map annotations, not across unrelated tabs or programs.
-- Real hardware should check: repeatedly enlarge/reduce stamp and verify its center; multi-click stamp selection/drag/deselect; editing saved text after reload; copy/paste/Undo/Redo; scrolling/zoom/Fit; series group ordering; 30-book bookshelf on laptop and phone; backup/restore and unplugged-media behavior.
+## Limitations and follow-up acceptance
+- Localhost navigation is blocked by the managed Chromium testing environment; map browser testing therefore ran from an isolated synthetic document with combined module sources and a mocked File System Access folder plus mock digest. This is not equivalent to a live same-origin GitHub Pages and physical file picker workflow.
+- Desktop/mouse and responsive CSS were checked; actual touch long-press, Android/mobile browser differences, screen readers, and real hardware behavior still require hands-on evaluation.
+- Popover controls may visually overlap transient toast notifications. This is cosmetic, not a verified data-loss issue.
+- Existing copyright/use reminders remain for imported map images. Source image bytes are excluded from RAM recovery but preserved in normal full backups, subject to current limits.
 
-## Deployment note
+## Release instructions / data safety
+1. Back up the actual writer folder independently; keep complete v4.2.3 ZIP for code rollback.
+2. Publish complete v4.2.4 web root and relative assets; confirm the footer and reload all changed JS/CSS.
+3. Test in Claire's disposable writer library first. Cover/Spine views: multiple collections, uploaded art, series labels, tooltips, delete controls, manuscript buttons and writer switch. World Maps: selected-stamp controls, geometry/camera stability, copying, Undo/Redo, import/backup/recovery.
+4. Do not delete or overwrite any original map or library files to solve UI errors; report the exact steps and browser width if a bug occurs.
 
-Back up the user's writer library and retain the full preceding release before publishing all v4.2.3 files. No source code or writing data was changed on the user's live site by this QA run.
+**Conclusion:** Focused visual/interaction tests pass in disposable Chromium fixtures. v4.2.4 remains a QA candidate pending actual deployment and device/library acceptance; no real writer data was modified during these tests.

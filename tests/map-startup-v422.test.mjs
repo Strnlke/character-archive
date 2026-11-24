@@ -12,8 +12,8 @@ test('World Maps entry point parses AS AN ES MODULE (regression v4.2.1)',()=>{
 test('World Maps is loaded with map core in app HTML',()=>{
  const map=readFileSync(resolve(root,'world-maps.html'),'utf8');
  const host=readFileSync(resolve(root,'index.html'),'utf8');
- assert.match(map,/type="module" src="world-maps\.js\?v=4\.2\.3"/);
- assert.match(host,/maps-host-v420\.js\?v=4\.2\.3/);
+ assert.match(map,/type="module" src="world-maps\.js\?v=4\.2\.4"/);
+ assert.match(host,/maps-host-v420\.js\?v=4\.2\.4/);
  assert.match(map,/World Maps failed to start/);
 });
 test('No map data schema migration in hotfix',()=>{

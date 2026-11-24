@@ -62,9 +62,10 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.2.3';
+const APP_VERSION = '4.2.4';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
+  ['4.2.4','Readable Bookshelf & Contextual Stamp Controls',['Readable title ribbons above covers and full-title hover/focus/long-press previews','Spine titles retain their vertical orientation with uploaded cover artwork','Contextual stamp resize/rotate tools appear only for a selected stamp without changing the map viewport','No map-file migration or change to recovery and backup behavior']],
   ['4.2.3','Map Interaction & Adaptive Bookshelf',['Drag to pan by default; double-click a saved map object to select or edit it','Copy/paste/duplicate map objects with Ctrl+C, Ctrl+V and Ctrl+D; fixed-center reversible resizing','Fit to Screen stays visible without a Select/Pan toolbar mode','Adaptive bookshelf cover density with optional remembered spine view','RAM recovery indicator now uses correctly converted decimal MB units']],
   ['4.2.2','World Maps Startup Hotfix',['Fixed a syntax error that blocked the entire World Maps editor from loading','Added visible startup/connection diagnostics and safer folder-picker behavior','Kept the existing editable map files, storage schema and recovery model unchanged']],
   ['4.1.3','Mobile Interface Update',['Mobile-only compact application menu with visible save status','Responsive bookshelf spacing, horizontal recent-work cards, and touch-friendly books','Novel actions, character gallery and editor adapted for small screens','Manuscript, notes, series and timeline controls adapted for mobile','Desktop styles, storage behavior and library format remain unchanged']],
@@ -1218,6 +1219,7 @@ function renderCharacterList() {
 }
 function hideMainViews() {
   if(!$('manuscriptView').classList.contains('hidden'))releaseManuscriptResources();
+  hideBookshelfTooltip();
   for (const id of ['bookshelfView', 'novelNotesView', 'seriesView', 'novelView', 'treeView', 'timelineView', 'librarySearchView', 'manuscriptView', 'emptyView', 'editor']) $(id).classList.add('hidden');
 }
 function cleanGalleryUrls() {
@@ -1227,7 +1229,6 @@ function cleanGalleryUrls() {
 function makeBook(novel, index, mode='covers') {
   const tile = el('div', 'bookTile');
   const button = el('button', 'bookCover bookVariant' + (index % 6));
-  if(mode==='spines')button.title=novel.name;
   button.type = 'button';
   button.setAttribute('aria-label', 'Open ' + novel.name + ' characters');
   const cover = el('span','bookFront');
@@ -1246,7 +1247,9 @@ function makeBook(novel, index, mode='covers') {
     if(state.novel?.id!==novel.id)await chooseNovel(novel.id);
     if(state.novel?.id===novel.id)await showManuscript();
   });
-  tile.append(button, manuscript, remove);
+  const titleBox=el('span','bookTitleBox',novel.name);
+  tile.append(titleBox,button,manuscript,remove);
+  attachBookTitleTooltip(button,titleBox,novel.name);
   const series=seriesForBook(novel.id);
   if(series){
     const position=series.bookIds.indexOf(novel.id)+1;
@@ -1264,6 +1267,64 @@ function makeBook(novel, index, mode='covers') {
   }
   return tile;
 }
+/* v4.2.4 — Full book titles without interfering with opening a book.
+   One fixed tooltip avoids clipping in overflowing bookshelf rows. */
+let bookshelfTooltip=null, bookshelfTooltipTimer=null, bookshelfTooltipDismiss=null;
+let bookshelfTooltipAnchor=null, bookshelfTooltipName=null;
+function hideBookshelfTooltip(){
+ clearTimeout(bookshelfTooltipTimer);clearTimeout(bookshelfTooltipDismiss);
+ if(bookshelfTooltip)bookshelfTooltip.hidden=true;
+ bookshelfTooltipAnchor=null;bookshelfTooltipName=null;
+}
+function showBookshelfTooltip(anchor,name){
+ if(!anchor.isConnected)return;
+ if(!bookshelfTooltip){
+  bookshelfTooltip=document.createElement('div');bookshelfTooltip.id='bookshelfFullTitle';
+  bookshelfTooltip.setAttribute('role','tooltip');bookshelfTooltip.hidden=true;
+  document.body.append(bookshelfTooltip);
+ }
+ bookshelfTooltipAnchor=anchor;bookshelfTooltipName=name;
+ bookshelfTooltip.textContent=name;bookshelfTooltip.hidden=false;
+ const r=anchor.getBoundingClientRect();
+ const w=bookshelfTooltip.offsetWidth,h=bookshelfTooltip.offsetHeight,pad=10;
+ const left=Math.max(pad,Math.min(window.innerWidth-w-pad,r.left+r.width/2-w/2));
+ const below=r.bottom+9;
+ bookshelfTooltip.style.left=left+'px';
+ bookshelfTooltip.style.top=(below+h+pad<=window.innerHeight?below:Math.max(pad,r.top-h-9))+'px';
+}
+function attachBookTitleTooltip(button,label,name){
+ let longPress=null,blockedClick=false;
+ const clearHold=()=>{clearTimeout(longPress);longPress=null};
+ const waitForHover=anchor=>{clearTimeout(bookshelfTooltipTimer);bookshelfTooltipTimer=setTimeout(()=>showBookshelfTooltip(anchor,name),420)};
+ for(const anchor of [button,label]){
+  anchor.addEventListener('pointerenter',e=>{if(e.pointerType!=='touch')waitForHover(anchor)});
+  anchor.addEventListener('pointerleave',hideBookshelfTooltip);
+ }
+ button.addEventListener('focus',()=>showBookshelfTooltip(button,name));
+ button.addEventListener('blur',hideBookshelfTooltip);
+ button.addEventListener('pointerdown',e=>{
+  if(e.pointerType!=='touch')return;
+  clearHold();longPress=setTimeout(()=>{
+   blockedClick=true;showBookshelfTooltip(button,name);
+   clearTimeout(bookshelfTooltipDismiss);bookshelfTooltipDismiss=setTimeout(hideBookshelfTooltip,2600);
+  },550);
+ });
+ button.addEventListener('pointermove',clearHold);
+ button.addEventListener('pointerup',clearHold);
+ button.addEventListener('pointercancel',clearHold);
+ // Browser click follows pointerup; swallow the navigation caused by a long press.
+ button.addEventListener('click',e=>{
+  if(!blockedClick)return;
+  blockedClick=false;e.preventDefault();e.stopImmediatePropagation();
+ },true);
+}
+window.addEventListener('scroll',()=>{
+ if(!bookshelfTooltip||bookshelfTooltip.hidden||!bookshelfTooltipAnchor)return;
+ const rect=bookshelfTooltipAnchor.getBoundingClientRect();
+ if(rect.bottom<0||rect.top>innerHeight){hideBookshelfTooltip();return}
+ showBookshelfTooltip(bookshelfTooltipAnchor,bookshelfTooltipName);
+},true);
+window.addEventListener('resize',hideBookshelfTooltip,{passive:true});
 const BOOKSHELF_VIEW_PREF_PREFIX='character-bookshelf-shelf-v423:';
 const bookshelfViewSession=new Map();
 let bookshelfResizePending=false;
@@ -1289,10 +1350,10 @@ function bookshelfGeometry(mode){
   return {capacity:cols,width:Math.max(37,Math.min(55,Math.floor((available-gap*(cols-1))/cols)))};
  }
  const count=state.novels.length;
- const preferred=count>=24?112:count>=13?128:count>=7?142:155;
+ const preferred=count>=24?118:count>=13?130:count>=7?142:155;
  const gap=count>=13?12:16;
- const capacity=Math.max(2,Math.min(10,Math.ceil((available+gap)/(preferred+gap))));
- const width=Math.max(86,Math.min(155,Math.floor((available-gap*(capacity-1))/capacity)));
+ const capacity=Math.max(2,Math.min(9,Math.floor((available+gap)/(preferred+gap))));
+ const width=Math.max(112,Math.min(155,Math.floor((available-gap*(capacity-1))/capacity)));
  return {capacity,width};
 }
 function renderBookshelfCards(mode=bookshelfMode()){
@@ -1305,7 +1366,7 @@ function renderBookshelfCards(mode=bookshelfMode()){
  $('bookshelfView').dataset.shelfMode=mode;
  container.style.setProperty('--shelf-card-width',geometry.width+'px');
  container.style.setProperty('--shelf-cover-height',Math.round(geometry.width*1.38)+'px');
- container.replaceChildren();
+ hideBookshelfTooltip();container.replaceChildren();
  if(!state.novels.length){
   const empty=el('div','noBooks');empty.append(el('span','bigGlyph','▤'),el('p','','Your first book belongs here.'));container.append(empty);return;
  }
@@ -2733,7 +2794,8 @@ async function showBookCover(novel, frame){
     const file=await(await dir.getFileHandle(novel.coverFile)).getFile();
     if(!frame.isConnected)return;
     const url=URL.createObjectURL(file);state.coverUrls.push(url);
-    frame.replaceChildren();const img=el('img','uploadedBookImage');img.src=url;img.alt='';frame.append(img);
+    if(!frame.classList.contains('bookFront'))frame.replaceChildren();
+    const img=el('img','uploadedBookImage');img.src=url;img.alt='';frame.append(img);
   }catch(e){console.warn('Could not load cover:',e);}
 }
 async function uploadBookCover(evt){

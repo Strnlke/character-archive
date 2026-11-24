@@ -218,7 +218,7 @@ function makeCanvas({annotationsOnly=false,withImage=true,ghosts=true,editorGrid
  if(ghosts)for(const o of previewObjects){const e=makeObject(o,true);if(e)svg.append(e)}
  return svg;
 }
-function render(){const stage=$('stage');stage.replaceChildren();if(!current){stage.classList.add('hidden');$('empty').classList.remove('hidden');$('fit-map').disabled=true;return}
+function render(){updateStampContext();const stage=$('stage');stage.replaceChildren();if(!current){stage.classList.add('hidden');$('empty').classList.remove('hidden');$('fit-map').disabled=true;return}
  $('empty').classList.add('hidden');stage.classList.remove('hidden');stage.dataset.tool=tool;
  stage.setAttribute('viewBox',viewState());stage.setAttribute('preserveAspectRatio','xMidYMid meet');
  const fragment=makeCanvas({editorGrid:true});while(fragment.firstChild)stage.append(fragment.firstChild);
@@ -284,7 +284,14 @@ function eraseTarget(e){
   }
  }return best;
 }
-function selectVisual(){for(const node of $('stage').querySelectorAll('[data-id]'))node.setAttribute('opacity',node.getAttribute('data-id')===selectedId?'.75':'1')}
+function updateStampContext(){
+ const selected=current?.objects.find(o=>o.id===selectedId);
+ const isStamp=selected?.kind==='stamp';
+ if(isStamp)document.querySelector('.main').style.setProperty('--stamp-context-top',Math.ceil($('toolbar').getBoundingClientRect().height+7)+'px');
+ $('stamp-context').classList.toggle('hidden',!isStamp);
+ if(isStamp)$('stamp-scale').textContent=Math.round((selected.scale||1)*100)+'%';
+}
+function selectVisual(){for(const node of $('stage').querySelectorAll('[data-id]'))node.setAttribute('opacity',node.getAttribute('data-id')===selectedId?'.75':'1');updateStampContext()}
 function updateObjectVisual(obj){
  const node=Array.from($('stage').querySelectorAll('[data-id]')).find(n=>n.getAttribute('data-id')===obj.id);
  if(!node)return;

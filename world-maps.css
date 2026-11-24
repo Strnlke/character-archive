@@ -48,3 +48,12 @@ body.sidebar-collapsed .main{width:100%}
 .stage[data-tool='navigate'] .editable[opacity=".75"]{cursor:move}
 #fit-map{white-space:nowrap;border-color:#557eb0;background:#25476b;font-weight:700}
 #fit-map:disabled{opacity:.4}
+
+/* v4.2.4 — Contextual stamp tools overlay the map without resizing the canvas. */
+.main{position:relative}
+.stamp-context{position:absolute;right:105px;top:var(--stamp-context-top,56px);z-index:25;display:flex;align-items:center;gap:7px;white-space:nowrap;background:#1b2d42;border:1px solid #6e94bd;border-radius:9px;padding:7px 9px;box-shadow:0 12px 30px #000b}
+.stamp-context.hidden{display:none!important}
+.stamp-context-title{font-size:11px;color:#c9d9ec;font-weight:650;padding-right:5px}
+.stamp-context button{width:31px;min-height:29px;padding:4px 7px;border-radius:6px;font-size:17px;line-height:1}
+.stamp-context output{min-width:46px;text-align:center;font-size:12px;font-variant-numeric:tabular-nums;color:#edf3ff}
+@media(max-width:680px){.stamp-context{right:10px;max-width:calc(100vw - 22px)}.stamp-context-title{display:none}}

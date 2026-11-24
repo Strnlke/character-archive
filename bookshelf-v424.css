@@ -1,0 +1,34 @@
+/* Character Bookshelf v4.2.4 — bookshelf readability, no changes to stored novel data */
+#bookshelfView[data-shelf-mode="covers"] .bookTile{--book-ribbon-height:42px;gap:7px}
+#bookshelfView[data-shelf-mode="covers"] .bookTitleBox{
+ display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+ height:var(--book-ribbon-height);min-height:var(--book-ribbon-height);
+ padding:5px 7px;overflow:hidden;overflow-wrap:anywhere;
+ background:#1a2c40;border:1px solid #36516d;border-radius:6px;
+ color:#eaf1f9;font:650 12.5px/1.26 Inter,ui-sans-serif,system-ui,sans-serif;
+ text-align:center;text-overflow:ellipsis;
+}
+#bookshelfView[data-shelf-mode="covers"] .bookTitle{display:none}
+#bookshelfView[data-shelf-mode="covers"] .bookFront{position:relative}
+#bookshelfView[data-shelf-mode="covers"] .bookSeriesLink{top:calc(var(--book-ribbon-height) + 15px)}
+#bookshelfView[data-shelf-mode="covers"] .bookDeleteBtn{top:calc(var(--book-ribbon-height) + 15px)}
+/* Uploaded artwork remains visible in cover mode, and the underlying text stays in DOM. */
+#bookshelfView[data-shelf-mode="covers"] .bookFront:has(.uploadedBookImage){padding:0}
+#bookshelfView[data-shelf-mode="covers"] .uploadedBookImage{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2}
+/* Spines use the real book title, not horizontal text rasterized into the cover image. */
+#bookshelfView[data-shelf-mode="spines"] .bookTitleBox{display:none}
+#bookshelfView[data-shelf-mode="spines"] .uploadedBookImage{display:none!important}
+#bookshelfView[data-shelf-mode="spines"] .bookFront:has(.uploadedBookImage){padding:27px 3px 8px}
+#bookshelfView[data-shelf-mode="spines"] .bookFront:has(.uploadedBookImage):before{display:block}
+#bookshelfView[data-shelf-mode="spines"] .bookTitle{display:block;writing-mode:vertical-rl;transform:rotate(180deg);font-size:12px;line-height:1.2;
+ max-width:100%;max-height:167px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;}
+/* Accessible fixed tooltip: never cropped by a shelf or card overflow. */
+#bookshelfFullTitle:not([hidden]){
+ position:fixed;z-index:9999;display:block;max-width:min(340px,calc(100vw - 20px));min-width:90px;
+ padding:8px 11px;background:#29415d;border:1px solid #83a7cb;border-radius:7px;
+ color:#f4f7fd;font:600 13px/1.45 Inter,ui-sans-serif,system-ui,sans-serif;
+ text-align:center;overflow-wrap:anywhere;box-shadow:0 10px 28px #000a;pointer-events:none;
+}
+@media(max-width:750px){
+ #bookshelfView[data-shelf-mode="covers"] .bookTitleBox{font-size:12px}
+}
