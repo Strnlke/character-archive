@@ -62,7 +62,7 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.2.0';
+const APP_VERSION = '4.2.1';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
   ['4.1.3','Mobile Interface Update',['Mobile-only compact application menu with visible save status','Responsive bookshelf spacing, horizontal recent-work cards, and touch-friendly books','Novel actions, character gallery and editor adapted for small screens','Manuscript, notes, series and timeline controls adapted for mobile','Desktop styles, storage behavior and library format remain unchanged']],
@@ -3530,7 +3530,7 @@ function openTutorial(){
   if(!dialog.open)dialog.showModal();
 }
 function popOutTutorial(){
-  const win=window.open('tutorial.html?v=4.2.0','characterBookshelfTutorial','width=1100,height=780,resizable=yes,scrollbars=yes');
+  const win=window.open('tutorial.html?v=4.2.1','characterBookshelfTutorial','width=1100,height=780,resizable=yes,scrollbars=yes');
   if(win){win.focus();$('tutorialDialog').close();}
   else toast('Pop-up blocked. Allow pop-ups for this site or use the tutorial in this window.',true);
 }

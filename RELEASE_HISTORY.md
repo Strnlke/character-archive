@@ -1,5 +1,19 @@
 # Release History — Character Bookshelf
 
+## v4.2.1 — World Maps full-page workspace, interaction repairs and hybrid stamps (candidate)
+
+- Replaced the World Maps modal with a full-viewport in-app page while retaining the same writer folder bridge and independent map schema.
+- Reorganized editor chrome: compact tools, contextual stamp chooser, collapsible map list, Views menu for Fit/zoom/editor grid, Back navigation.
+- Fixed initial Fit using the visible stage container rather than the hidden SVG (preventing a zero-size viewBox).
+- Reworked pointer gesture handling: move only the active object's SVG attributes during dragging; update the viewport directly when panning; preserve pointer capture without replacing the whole SVG tree mid-gesture.
+- Eraser now removes the clicked annotation at pointer-down, with a small hit tolerance for thin pencil strokes; stamps include transparent selection hit regions that are removed from exports.
+- Pencil uses a distinct pencil cursor; grabbing cursor appears only during Pan dragging.
+- Stamps use restrained monochrome hybrid-cartography linework and retain one-object cluster storage.
+- Editor grid never renders into any export format (PNG, SVG, Print/Save as PDF); it is visible only in the editor.
+- Characters page nav/action buttons are smaller with single-line labels and better novel-title flex sizing.
+- Maintains additive `world-maps/` storage, verified-save and image-excluded RAM recovery architecture; **no schema migration**.
+- Confirmed 9/9 pure map-data Node tests; full browser pointer tests were blocked by Chromium environment URL policy and remain for real-device QA. No deployment performed.
+
 ## v4.2.0 — World Maps (Release B)
 - Adds novel and series World Maps launchers, locally stored maps/overlays and limited recovery/backup integration.
 - Blank canvas, optional grid and shapes; imported licensed image and independent annotations.

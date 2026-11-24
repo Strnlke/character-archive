@@ -12,3 +12,14 @@
 .cb-import-menu .cb-upload{min-height:40px;align-self:stretch}
 .cb-import-menu .cb-description{font-size:12px;color:#9fb4cb}
 @media(max-width:750px){.topbar{padding:9px 14px;min-height:0}.topbar .topactions{gap:6px}.novelActions .cb-import-menu{right:0;max-width:calc(100vw - 26px)}}
+
+/* v4.2.1: Compact Characters page. Never alter the bookshelf or editor sidebar. */
+.novelHeading .novelTitleControl{flex:1 1 320px;min-width:min(290px,100%)}
+.novelHeading .novelActions{gap:7px;flex:0 1 auto}
+.novelHeading .novelActions>button,.novelHeading .novelActions>.fileLabel{min-height:34px;height:34px;padding:7px 10px;font-size:12px;line-height:1.15}
+.collectionHeading{gap:9px;flex-wrap:wrap;align-items:center}
+.collectionHeading .treeNavButton{padding:7px 10px;min-height:34px;height:34px;font-size:12px;line-height:1.15;white-space:nowrap;flex:0 0 auto}
+.collectionHeading .quiet{min-height:34px;height:34px;padding:7px 10px;white-space:nowrap}
+.collectionHeading .gallerySortLabel select{min-height:34px}
+@media (max-width:1100px){.novelHeading{flex-wrap:wrap}.novelHeading .novelTitleControl{flex-basis:100%}.novelHeading .novelActions{justify-content:flex-start}}
+@media (max-width:750px){.novelHeading .novelActions{gap:7px}.novelHeading .novelActions>button,.novelHeading .novelActions>.fileLabel{min-height:40px;height:auto;padding:9px 8px;white-space:normal}.collectionHeading .treeNavButton{min-height:38px;height:auto}}
