@@ -1,5 +1,12 @@
 # Release History — Character Bookshelf
 
+## v4.2.2 — World Maps Startup Hotfix (QA candidate)
+- Fixed a missing closing parenthesis in `world-maps.js` pencil drawing logic; v4.2.1's entire map module failed to parse and therefore never connected to the writer's existing map files.
+- Added a visible startup/connection failure state and removed the inappropriate standalone-folder prompt from failed embedded sessions.
+- Improved exclusive menu handling, cache-busting, updated docs and realistic ES-module syntax testing.
+- No schema migration and no deletion or replacement of map data; compatibility with v4.2.0/v4.2.1 map JSON retained.
+- Browser smoke verified using disposable simulated storage; real GitHub/USB/device acceptance still required.
+
 ## v4.2.1 — World Maps full-page workspace, interaction repairs and hybrid stamps (candidate)
 
 - Replaced the World Maps modal with a full-viewport in-app page while retaining the same writer folder bridge and independent map schema.

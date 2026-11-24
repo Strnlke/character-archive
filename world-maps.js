@@ -320,7 +320,7 @@ function pointerMove(e){
  const p=pos(e);
  if(gesture.type==='draw'){
   const pts=draft.points,last=pts[pts.length-1];
-  if(Math.hypot(p.x-last[0],p.y-last[1])>1.6){pts.push([Math.round(p.x*10)/10,Math.round(p.y*10)/10]);gesture.preview.setAttribute('points',pts.map(v=>v.join(',')).join(' ')}
+  if(Math.hypot(p.x-last[0],p.y-last[1])>1.6){pts.push([Math.round(p.x*10)/10,Math.round(p.y*10)/10]);gesture.preview.setAttribute('points',pts.map(v=>v.join(',')).join(' '));}
  }else if(gesture.type==='move'){
   const obj=current.objects.find(o=>o.id===gesture.obj);if(!obj)return;
   const dx=p.x-gesture.start.x,dy=p.y-gesture.start.y;
@@ -465,4 +465,26 @@ changeTool('select');
 if(window.parent===window)$('back-to-bookshelf').classList.add('hidden');
 
 window.CBWorldMapsSession={canClose:()=>!dirty&&!busy};
-if(window.parent!==window&&window.parent.CBWorldMapsBridge){connectToBookshelf().catch(e=>{notify('Bookshelf connection failed: '+e.message,11000);status('NOT CONNECTED')})}
+if(window.parent!==window){
+ $('choose-folder').classList.add('hidden');
+ if(!window.parent.CBWorldMapsBridge){
+  status('Bookshelf connection unavailable');
+  $('maps-list').textContent='Could not connect to the active Character Bookshelf library. Return to Bookshelf and reopen World Maps; no map files were changed.';
+  $('new-map').disabled=true;
+ }else{
+  connectToBookshelf().catch(e=>{
+   console.error('World Maps connection failure:',e);
+   status('Bookshelf connection failed');
+   $('maps-list').textContent='Could not load maps from your writer folder: '+e.message+'. Existing map files have not been erased.';
+   notify('World Maps connection failed: '+e.message,30000);
+   $('new-map').disabled=true;
+  });
+ }
+}
+// Only one toolbar menu opens at a time.
+for(const details of document.querySelectorAll('details.menu')){
+ details.addEventListener('toggle',()=>{
+  if(details.open)for(const other of document.querySelectorAll('details.menu'))if(other!==details)other.open=false;
+ });
+ details.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>details.open=false));
+}

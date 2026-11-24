@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Character Bookshelf • World Maps</title><link rel="stylesheet" href="world-maps.css?v=4.2.1"></head><body>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Character Bookshelf • World Maps</title><link rel="stylesheet" href="world-maps.css?v=4.2.2"></head><body>
 <div class="app"><header class="topbar">
 <button id="back-to-bookshelf" class="back-nav" type="button" title="Back to Characters or Series">← Back</button>
 <div class="brand">World Maps <span id="workspace-owner">/ Character Bookshelf</span></div>
@@ -22,4 +22,22 @@
 <dialog id="dlg-combine"><form method="dialog" id="form-combine"><h2>Combine annotations</h2><p class="muted small">Only maps copied from the same original and using the same dimensions/image may be combined. Changes are added to this independent map, never to the original.</p><div class="field"><label for="combine-source">Source map</label><select id="combine-source"></select></div><div class="field"><label for="combine-mode">Import</label><select id="combine-mode"><option value="all">All annotations</option><option value="selected">Choose individual annotations</option></select></div><div id="combine-picks" class="list-picks hidden"></div><p id="combine-preview" class="muted small"></p><div class="buttons"><button value="cancel">Cancel</button><button value="merge" class="primary">Import onto this Map</button></div></form></dialog>
 <dialog id="dlg-export"><form method="dialog" id="form-export"><h2>Export map</h2><div class="field"><label for="export-format">Format</label><select id="export-format"><option value="png">PNG image</option><option value="svg">SVG vector image</option><option value="pdf">PDF (browser Print / Save as PDF)</option></select></div><div class="field"><label for="export-content">Content</label><select id="export-content"><option value="all">Complete map (including source image, if present)</option><option value="annotations">Annotations only (transparent background)</option></select></div><p class="muted small">Only include an imported source image when you have rights to reproduce it. Exports never change editable files.</p><div class="buttons"><button value="cancel">Cancel</button><button value="export" class="primary">Export</button></div></form></dialog>
 <dialog id="dlg-relink"><form method="dialog" id="form-relink"><h2>Missing source image</h2><p>Your editable annotations are safe, but this map's image is unlinked.</p><p class="muted small">Expected filename: <strong id="expected-filename"></strong></p><p class="muted small">Choose a matching file to restore the reference. If the fingerprint differs, the app will warn and refuse to replace it.</p><div class="buttons"><button value="cancel">Not Now</button><button value="blank">Convert to Blank (keep drawings)</button><button value="reset" class="danger">Start Over</button><button value="link" class="primary">Choose Image</button></div></form></dialog>
-<input id="pick-image" type="file" accept="image/png,image/jpeg,image/webp" hidden><input id="pick-recovery" type="file" accept="application/json,.json" hidden><script type="module" src="world-maps.js?v=4.2.1"></script></body></html>
+<input id="pick-image" type="file" accept="image/png,image/jpeg,image/webp" hidden><input id="pick-recovery" type="file" accept="application/json,.json" hidden><script>
+(function(){
+ const state={loaded:false};
+ function showFailure(reason){
+  if(window.CBWorldMapsSession)return;
+  const status=document.getElementById('save-status');
+  const list=document.getElementById('maps-list');
+  if(status)status.textContent='World Maps failed to start';
+  if(list)list.textContent='The map editor could not start ('+reason+'). Your saved maps have NOT been deleted. Return to Bookshelf, verify that all release files were published, and hard-refresh.';
+  document.getElementById('new-map').disabled=true;
+  if(window.parent!==window)document.getElementById('choose-folder').classList.add('hidden');
+ }
+ window.CBWorldMapsStartupError=showFailure;
+ window.setTimeout(()=>{if(!window.CBWorldMapsSession)showFailure('startup script unavailable')},5000);
+ window.addEventListener('error',event=>{
+  if(!window.CBWorldMapsSession && event.target instanceof HTMLScriptElement)showFailure('a required script failed to load');
+ },true);
+})();
+</script><script type="module" src="world-maps.js?v=4.2.2"></script></body></html>
