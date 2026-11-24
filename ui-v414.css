@@ -1,0 +1,14 @@
+/* Character Bookshelf v4.1.4: scoped interface refinements; original shelves remain untouched. */
+.topbar{min-height:64px;height:auto;padding:8px 22px;gap:12px}
+.topbar .topactions{gap:7px}
+.topbar .topactions>.quiet,.topbar .topactions>.undoTopButton{padding:7px 10px;font-size:12px}
+.topbar #storageStatusBtn{display:none!important}
+/* Original drag-zone moved into a compact import panel, retaining its existing verified importer. */
+.novelActions{position:relative}
+.cb-import-menu{position:absolute;top:calc(100% + 8px);right:0;width:min(360px,calc(100vw - 26px));z-index:56;padding:15px;background:#162437;border:1px solid #49617c;border-radius:12px;box-shadow:0 18px 45px #000a;display:flex;flex-direction:column;gap:10px}
+.cb-import-menu[hidden]{display:none!important}
+.cb-import-menu strong{font-size:14px}
+.cb-import-menu .fileDropZone{margin:0;min-height:100px}
+.cb-import-menu .cb-upload{min-height:40px;align-self:stretch}
+.cb-import-menu .cb-description{font-size:12px;color:#9fb4cb}
+@media(max-width:750px){.topbar{padding:9px 14px;min-height:0}.topbar .topactions{gap:6px}.novelActions .cb-import-menu{right:0;max-width:calc(100vw - 26px)}}

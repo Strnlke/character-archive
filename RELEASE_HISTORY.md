@@ -1,3 +1,12 @@
+# Release History — Character Bookshelf
+
+## v4.1.4 — Interface Refinement (Release A)
+- Slim topbar; Storage Status remains accessible from footer, with save/recovery visible.
+- Import Character now opens compact upload / drag-and-drop menu; existing review safeguards preserved.
+- No file schema migration.
+
+## Previous releases (retained source)
+
 # Release History
 
 ## v4.1.3 — Dedicated Mobile Update
@@ -126,4 +135,5 @@ This is an archival summary of the release notes built into Character Bookshelf 
 
 - First functional USB-based character library, writer profiles, autosave, portraits, and individual JSON character files
 - Initial cloud storage integration proved unsuccessful, prompting a transition to USB-based local storage.
+
 
