@@ -1,0 +1,38 @@
+/* v4.2.3 — Adaptive bookshelf and opt-in spine view.
+   Presentation-only; novel/series identities, cover file data and books remain unchanged. */
+#bookshelfView{max-width:1240px}
+#bookshelfView .shelfBooks{padding-top:7px}
+#bookshelfView .bookShelf{padding:0 12px 15px;margin-bottom:10px}
+#bookshelfView .bookShelfRow{min-height:0;gap:12px;padding:6px 20px 0;overflow:visible}
+#bookshelfView .bookTile{flex:0 0 var(--shelf-card-width,155px);width:var(--shelf-card-width,155px);min-width:0;max-width:none;align-self:flex-end}
+#bookshelfView .bookTile>.bookCover{height:var(--shelf-cover-height,214px);min-height:0;flex:none}
+#bookshelfView .bookFront{padding:clamp(13px,2vw,24px) 9px 13px}
+#bookshelfView .bookTitle{font-size:clamp(10px,1.2vw,15px);line-height:1.15}
+#bookshelfView .bookOrnament{font-size:20px}
+#bookshelfView .bookFooter{font-size:6px}
+#bookshelfView .manuscriptShelfButton{font-size:11px;padding:6px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:32px}
+#bookshelfView .shelfPlank{height:18px}
+#bookshelfViewModeBtn{padding:8px 11px;white-space:nowrap}
+#bookshelfViewModeBtn[aria-pressed="true"]{background:#294666;border-color:#6b93c4}
+/* Narrow spines are independently clickable books, never an automatic mode. */
+#bookshelfView[data-shelf-mode="spines"] .bookShelf{padding-bottom:13px;margin-bottom:8px}
+#bookshelfView[data-shelf-mode="spines"] .bookShelfRow{gap:9px}
+#bookshelfView[data-shelf-mode="spines"] .bookTile>.bookCover{height:215px}
+#bookshelfView[data-shelf-mode="spines"] .bookFront{padding:27px 3px 8px;align-items:center;justify-content:center}
+#bookshelfView[data-shelf-mode="spines"] .bookFront:before{inset:5px 5px 5px 6px}
+#bookshelfView[data-shelf-mode="spines"] .bookTitle{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:167px;max-width:100%;font-size:clamp(10px,1.15vw,13px);letter-spacing:.35px;overflow-wrap:normal}
+#bookshelfView[data-shelf-mode="spines"] .bookOrnament,#bookshelfView[data-shelf-mode="spines"] .bookFooter{display:none}
+#bookshelfView[data-shelf-mode="spines"] .manuscriptShelfButton{font-size:15px;min-height:27px;padding:3px;text-align:center}
+#bookshelfView[data-shelf-mode="spines"] .bookSeriesLink{font-size:14px;min-height:20px;line-height:18px;padding:0 3px;left:2px;top:2px;max-width:22px}
+#bookshelfView[data-shelf-mode="spines"] .bookDeleteBtn{height:19px;width:19px;font-size:14px;right:1px;top:1px;opacity:0}
+#bookshelfView[data-shelf-mode="spines"] .bookTile:hover .bookDeleteBtn,#bookshelfView[data-shelf-mode="spines"] .bookTile:focus-within .bookDeleteBtn{opacity:1}
+@media(max-width:750px){
+ /* Preserve the proven mobile horizontal browsing behavior in cover mode. */
+ #bookshelfView[data-shelf-mode="covers"] .bookShelfRow{overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;gap:12px;padding:0 4px 0}
+ #bookshelfView[data-shelf-mode="covers"] .bookTile{flex:0 0 clamp(126px,41vw,156px);width:clamp(126px,41vw,156px);scroll-snap-align:start}
+ #bookshelfView[data-shelf-mode="covers"] .bookTile>.bookCover{height:clamp(186px,55vw,211px)}
+ #bookshelfView[data-shelf-mode="spines"] .bookShelfRow{overflow-x:auto;gap:9px;padding:4px 5px 0}
+ #bookshelfView[data-shelf-mode="spines"] .bookTile{flex:0 0 48px;width:48px}
+ #bookshelfView[data-shelf-mode="spines"] .bookDeleteBtn{opacity:1}
+ #bookshelfViewModeBtn{padding:7px 8px;font-size:11px}
+}

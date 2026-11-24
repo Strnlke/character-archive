@@ -28,9 +28,9 @@ async function persistSeries(next){
   }finally{seriesWriteBusy=false;}
 }
 function seriesForBook(id){return state.series.find(s=>s.bookIds.includes(id))||null;}
-function renderShelfSeries(){
-  // Keep one ordinary bookshelf. Series members stay adjacent in series order,
-  // with each row still using the same five-book shelf capacity as before.
+function renderShelfSeries(capacity=5){
+  // Keep one ordinary bookshelf, with adjustable row capacity for adaptive covers/spines.
+  // Preserve series order and avoid splitting small groups where possible.
   const bookGroups=[],seen=new Set();
   for(const novel of state.novels){
     if(seen.has(novel.id))continue;
@@ -45,9 +45,9 @@ function renderShelfSeries(){
   const endRow=()=>{if(row.length){shelves.push({books:row});row=[];}};
   for(const group of bookGroups){
     // Do not split a small series merely because only one space remains.
-    if(group.length<=5 && row.length && group.length>5-row.length)endRow();
+    if(group.length<=capacity && row.length && group.length>capacity-row.length)endRow();
     for(const book of group){
-      if(row.length===5)endRow();
+      if(row.length===capacity)endRow();
       row.push(book);
     }
   }

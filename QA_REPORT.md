@@ -1,30 +1,35 @@
-# QA Report - Character Bookshelf v4.2.2
+# Character Bookshelf v4.2.3 — QA Report
 
-**Release:** World Maps Startup Hotfix | **Date:** November 24, 2026
-**Build source:** v4.2.1 complete release | **Disposition:** QA candidate
+**Report date:** November 24, 2026  
+**Build:** v4.2.3 Map Interaction & Adaptive Bookshelf  
+**Verdict:** Focused automated checks passed. Real-device acceptance pending.
 
-## Failure reproduction and root cause
-User screenshots showed `No folder connected`, `Opening your writer's World Maps...`, disabled `New Map`, and unresponsive tools after v4.2.1 deployment. Inspecting v4.2.1 `world-maps.js` revealed an unclosed `setAttribute()` call in the pencil pointer-move handler. A correct Node ES-module parser reported `SyntaxError: missing ) after argument list`. The error stops the entire editor module from initializing and prevents connection to the existing writer's map directory. The visible symptoms do not establish file deletion.
+## Scope and method
 
-## Changes
-- Corrected the single missing `)` in the pencil pointer-move statement.
-- Added error-state text for JS module startup failures.
-- Embedded World Maps fails clearly if the Bookshelf writer bridge is missing or cannot connect, without suggesting a second folder.
-- Exclusive open-menu behavior and menu close on action.
-- Updated cache-busting/version and release documentation. No data/schema changes.
+1. **Node map model and interaction tests (20 of 20 passed):** `node --test tests/*.mjs`. Existing map-model tests cover schema invariance, independent map copy, selective merge, image-free recovery and duplicate safety. The startup test checks parse requirements. The new v4.2.3 interaction tests cover annotation cloning/new identity, size/rotation/color retention, stroke-point translation, repeated reversible resizing, shape/text/stamp sizing, and immutable source data.
+2. **Isolated Chromium map UI exercise:** Page assembled in a Playwright `about:blank` frame with equivalent source/markup and in-memory mock local folder handles. Exercise: initialize writer, create blank map, add stamp, native double-click select, Ctrl+C then Ctrl+V, drag empty region to pan, Fit to Screen, create text label, native double-click to edit saved text. No page exceptions observed in this sequence. Found and repaired the intermediate no-op-click DOM rebuild that swallowed native double-click selection.
+3. **Isolated Chromium bookshelf UI exercise:** Rendered 30 fictional novel records in an in-memory writer state. Checked cover and spine modes, shelf counts, responsive geometry and computed spine presentation. No source novel data was changed in this test.
+4. **Static/source checks:** Confirmed release version and asset cache-busting references, HTML/CSS/JS source presence, recovery numerator/denominator conversion, new helper import, absence of the previous Select/Pan toolbar controls.
 
-## Verifications run
-| Check | Result | Limitation |
+## Results and evidence
+
+| Test group | Result | Qualification |
 |---|---|---|
-| World Maps ES-module parsing (`node --input-type=module --check`) | PASS | Actual source syntax, not live network loading |
-| Existing world-maps data-model tests | 9/9 PASS | Isolated model fixtures |
-| New startup regression tests | 3/3 PASS | Source/integration assertions |
-| Chromium browser: writer connection, new map, stamp, pencil stroke, eraser, autosave, reopen existing map | PASS | Embedded synthetic DOM and mock File System Access/digest; not live GitHub or physical USB |
-| Browser runtime errors during synthetic scenario | 0 | Limited to scripted test actions |
-| ZIP structure + file hashes | PASS | Static package integrity |
+| Node automated tests | 20/20 pass | Pure model/startup/interaction helper tests |
+| Map simulated browser workflow | Pass for exercised actions | Mock storage, `about:blank` inline harness, no USB dialog |
+| Adaptive bookshelf simulated browser workflow | Pass for exercised layout DOM | 30 fictional novels; screenshots not accepted as universal pixel fidelity |
+| Real writer library and live GitHub Pages | Not run | Needs owner acceptance |
+| Real USB/storage disconnect/conflict recovery | Not run | Critical high-risk area, not certified |
+| Android/mobile gesture and export/printing fidelity | Not run end-to-end | Needs physical-device QA |
 
-## Not verified
-Live deployed GitHub Pages behavior; actual author-side folder selection and USB permission; Android/touch; corrupted or partial real library; full backup/recovery; very large map rendering/export; all drawing/panning/Undo scenarios. Automated browsers were blocked from navigating to localhost in this execution environment.
+## Known limitations / cautions
 
-## Safety and rollout
-Keep previous complete ZIP and an independent actual-library backup. Install complete v4.2.2 source, hard-refresh, confirm footer version. Reopen an existing novel -> World Maps. If it still says disconnected, do not create a different library: check browser console/network, complete file publication, and the selected writer folder. Do not remove old maps or overwrite their image/JSON files.
+- Managed browser policy in this environment blocks normal localhost navigation. `about:blank` isolated harness tests are useful **but not equal** to full integrated live deployment.
+- Changing writer bookshelf view persists in the current browser per writer; storage-disabled browsers retain only session preference.
+- Writer ZIP and recovery limits remain those of the v4.2.2 architecture; this release does not expand them.
+- Browser clipboard keyboard shortcuts operate on map annotations, not across unrelated tabs or programs.
+- Real hardware should check: repeatedly enlarge/reduce stamp and verify its center; multi-click stamp selection/drag/deselect; editing saved text after reload; copy/paste/Undo/Redo; scrolling/zoom/Fit; series group ordering; 30-book bookshelf on laptop and phone; backup/restore and unplugged-media behavior.
+
+## Deployment note
+
+Back up the user's writer library and retain the full preceding release before publishing all v4.2.3 files. No source code or writing data was changed on the user's live site by this QA run.

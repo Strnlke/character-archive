@@ -136,9 +136,9 @@ function installTitleEditor(){
 function updateRecoveryMeter(){
   const meter=$('recoveryMeter');if(!meter)return;
   meter.classList.toggle('hidden',!state.root);
-  const m=(memoryRecovery.bytes/1048576).toFixed(2),cap=Math.round(RECOVERY_LIMIT/1048576);
-  meter.textContent='Recovery '+m+' / '+cap+' MiB';
-  meter.title=(memoryRecovery.complete?'Complete':'Partial or scanning')+' temporary RAM snapshot. Manuscript files excluded.';
+  const m=(memoryRecovery.bytes/1000000).toFixed(2),cap=(RECOVERY_LIMIT/1000000).toFixed(2);
+  meter.textContent='Recovery '+m+' MB / '+cap+' MB';
+  meter.title=(memoryRecovery.complete?'Complete':'Partial or scanning')+' temporary RAM recovery usage, not a permanent backup. Source manuscript and map image files are excluded. Displayed as decimal MB.';
 }
 function bindFileDrop(zoneId,inputId,validate,label){
   const zone=$(zoneId),input=$(inputId);if(!zone||!input)return;

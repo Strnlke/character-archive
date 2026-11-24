@@ -1,5 +1,13 @@
 # Release History — Character Bookshelf
 
+## v4.2.3 — Map Interaction & Adaptive Bookshelf (QA candidate)
+- World Maps defaults to drag-to-pan and wheel zoom. Select/Pan buttons are removed; native double-click selects existing stamps/shapes and opens saved labels for editing. Selected objects stay active until a blank click or Escape.
+- Fit to Screen is permanently visible. Clipboard-style copy/paste (Ctrl+C/V), Ctrl+D and Object menu options retain annotation appearance while creating independent object IDs. Reversible resizing prevents drifting from successive size changes.
+- Resolved a double-click regression found in isolated browser testing: do not replace SVG nodes after an otherwise unchanged click.
+- Adaptive cover size and shelf spacing, plus an optional per-writer locally remembered Spine view; preserve series order/grouping when feasible.
+- Display correctly converted decimal MB for the volatile RAM recovery numerator and capacity without changing recovery storage budgets.
+- Current release is additive: no novel, character, series, or map JSON migration. Focused simulated browser QA and 20/20 automated Node tests; live GitHub, real USB/Android and broad reliability tests remain user acceptance tasks.
+
 ## v4.2.2 — World Maps Startup Hotfix (QA candidate)
 - Fixed a missing closing parenthesis in `world-maps.js` pencil drawing logic; v4.2.1's entire map module failed to parse and therefore never connected to the writer's existing map files.
 - Added a visible startup/connection failure state and removed the inappropriate standalone-folder prompt from failed embedded sessions.

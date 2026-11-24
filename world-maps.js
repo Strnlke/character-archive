@@ -1,14 +1,16 @@
 import {SCHEMA,id,newMap,duplicateMap,compatible,combine,recoverMap,stripImageBytes,validate,STAMPS,SHAPES} from './world-maps-core.mjs';
+import {resizeAnnotation,copyAnnotation} from './world-maps-interactions-v423.mjs';
 /* World Maps: additive map data in current Bookshelf writer folder; no legacy migration. */
 const $ = x => document.getElementById(x);
 const NS='http://www.w3.org/2000/svg';
 const DIR_NAME='Character Bookshelf World Maps';
 const INDEX='world-maps-index.json';
 let root=null, work=null, current=null, records=[], allMaps=new Map(), savedHashes=new Map();
-let dirty=false, busy=false, autosave=null, editVersion=0, imageUrl=null, tool='select', history=[],future=[], draft=null;
+let dirty=false, busy=false, autosave=null, editVersion=0, imageUrl=null, tool='navigate', history=[],future=[], draft=null;
 let pan={x:0,y:0,w:1600,h:1000}, gesture=null, previewObjects=[], selectedId=null;
 let sessionRecovery=new Map();
 let attached=null, attachedBridge=null;
+let copiedAnnotation=null, pasteCount=0, lastClickedObjectId=null;
 function notify(msg,ms=5500){$('message').textContent=msg;$('message').classList.remove('hidden');clearTimeout(notify.t);notify.t=setTimeout(()=>$('message').classList.add('hidden'),ms)}
 function status(msg){$('save-status').textContent=msg}
 function sanitize(s){return String(s||'').trim().slice(0,150)}
@@ -200,7 +202,7 @@ function makeObject(obj,ghost=false){let el;
  if(obj.kind==='shape')el=makeShape(obj);
  if(obj.kind==='stamp')el=makeStamp(obj);
  if(obj.kind==='stroke')el=svgEl('polyline',{points:(obj.points||[]).map(p=>p.join(',')).join(' '),fill:'none',stroke:obj.color||'#263f4b','stroke-width':obj.width||3,'stroke-linecap':'round','stroke-linejoin':'round'});
- if(obj.kind==='text')el=svgEl('text',{x:obj.x,y:obj.y,fill:obj.color||'#263f4b','font-size':obj.fontSize||30,'font-weight':650,'font-family':'sans-serif','dominant-baseline':'middle'},obj.text||'Location');
+ if(obj.kind==='text')el=svgEl('text',{x:obj.x,y:obj.y,transform:`rotate(${obj.rotation||0} ${obj.x} ${obj.y})`,fill:obj.color||'#263f4b','font-size':obj.fontSize||30,'font-weight':650,'font-family':'sans-serif','dominant-baseline':'middle'},obj.text||'Location');
  if(!el)return null;
  if(ghost){el.setAttribute('opacity','.45');el.setAttribute('stroke-dasharray','7 5');}
  else{el.setAttribute('data-id',obj.id);el.classList.add('editable');if(obj.id===selectedId){el.setAttribute('filter','url(#noop)');el.setAttribute('opacity','.75');}}
@@ -216,12 +218,13 @@ function makeCanvas({annotationsOnly=false,withImage=true,ghosts=true,editorGrid
  if(ghosts)for(const o of previewObjects){const e=makeObject(o,true);if(e)svg.append(e)}
  return svg;
 }
-function render(){const stage=$('stage');stage.replaceChildren();if(!current){stage.classList.add('hidden');$('empty').classList.remove('hidden');return}
+function render(){const stage=$('stage');stage.replaceChildren();if(!current){stage.classList.add('hidden');$('empty').classList.remove('hidden');$('fit-map').disabled=true;return}
  $('empty').classList.add('hidden');stage.classList.remove('hidden');stage.dataset.tool=tool;
  stage.setAttribute('viewBox',viewState());stage.setAttribute('preserveAspectRatio','xMidYMid meet');
  const fragment=makeCanvas({editorGrid:true});while(fragment.firstChild)stage.append(fragment.firstChild);
  $('relink').classList.toggle('hidden',!current.baseImage?.unlinked);
- $('hint').textContent=current.baseImage?.unlinked?`Unlinked • Missing ${current.baseImage.filename||'source image'}. Annotations are displayed; re-link or convert to blank.`:`${current.title} • ${current.objects.length} editable objects • ${tool} mode • Wheel to zoom`;
+ $('hint').textContent=current.baseImage?.unlinked?`Unlinked • Missing ${current.baseImage.filename||'source image'}. Annotations are displayed; re-link or convert to blank.`:`${current.title} • ${current.objects.length} objects • Drag to pan, scroll to zoom, double-click an object to edit • Esc exits drawing tools`;
+ $('fit-map').disabled=false;
  updateMeta();
 }
 function updateMeta(){if(!current){$('map-meta').textContent='No map selected';return}$('map-meta').textContent=`${current.scope} • ${current.owner} • ${current.canvas.width}×${current.canvas.height} • ${current.objects.length} objects${dirty?' • Unsaved':''}`}
@@ -243,18 +246,18 @@ function renderList(){
 async function refreshList(){renderList()}
 async function setImageUrl(){if(imageUrl){URL.revokeObjectURL(imageUrl);imageUrl=null}if(!current?.baseImage||current.baseImage.unlinked)return;try{const f=await readBytes(await imgDir(),current.baseImage.storageFile);imageUrl=URL.createObjectURL(f)}catch{current.baseImage.unlinked=true;current.baseImage.storageFile=null;notify('Map annotations recovered, but the original image is unavailable. Re-link it when ready.',8500)}}
 async function selectMap(mid){if(current?.id===mid)return;await saveNow();if(dirty){notify('Unsaved changes must be resolved before switching maps. Export emergency recovery if needed.',9000);return}
- try{current=await loadMap(mid);history=[];future=[];previewObjects=[];selectedId=null;await setImageUrl();fit();renderList();$('emergency-save').disabled=false;status(`Loaded • ${current.title}`)}catch(e){notify(e.message,9000)}
+ try{current=await loadMap(mid);history=[];future=[];previewObjects=[];selectedId=null;copiedAnnotation=null;pasteCount=0;await setImageUrl();fit();renderList();$('emergency-save').disabled=false;status(`Loaded • ${current.title}`)}catch(e){notify(e.message,9000)}
 }
 async function saveNew(m,image=null){validate(m);if(records.some(r=>r.id===m.id))throw Error('Duplicate map identity');
  if(image){await saveImageFor(m,image)}
- await writeMap(m);current=m;history=[];future=[];selectedId=null;dirty=false;sessionRecovery.set(m.id,stripImageBytes(m));$('filter-scope').value=m.scope;await setImageUrl();fit();renderList();$('emergency-save').disabled=false;status('Saved • new map');
+ await writeMap(m);current=m;history=[];future=[];selectedId=null;copiedAnnotation=null;pasteCount=0;dirty=false;sessionRecovery.set(m.id,stripImageBytes(m));$('filter-scope').value=m.scope;await setImageUrl();fit();renderList();$('emergency-save').disabled=false;status('Saved • new map');
 }
 async function saveImageFor(map,file){const mime=fileMime(file);if(!['image/png','image/jpeg','image/webp'].includes(mime))throw Error('Only PNG, JPEG, and WebP are supported');if(file.size>64*1024*1024)throw Error('Image too large (64 MiB limit)');
  const bytes=await file.arrayBuffer();const hash=await sha(bytes),storageFile=`${map.id}.${mime==='image/png'?'png':mime==='image/webp'?'webp':'jpg'}`;
  const target=await imgDir();const handle=await getFile(target,storageFile,true),writer=await handle.createWritable();await writer.write(bytes);await writer.close();if(await sha(await (await handle.getFile()).arrayBuffer())!==hash)throw Error('Image write verification failed');
  const img=await createImageBitmap(file);map.baseImage={filename:file.name,sha256:hash,width:img.width,height:img.height,mime,storageFile,unlinked:false};img.close();
 }
-function changeTool(v){tool=v;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.getAttribute('data-tool')===tool));$('stage').dataset.tool=tool;$('stamp-kind').classList.toggle('hidden',tool!=='stamp');if(current)render()}
+function changeTool(v){tool=(v===tool&&v!=='navigate')?'navigate':v;document.querySelectorAll('[data-tool]').forEach(b=>{const active=b.dataset.tool===tool;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});$('stage').dataset.tool=tool;$('stamp-kind').classList.toggle('hidden',tool!=='stamp');if(current)render()}
 function clickStage(e){if(!current)return;const p=pos(e),color=$('draw-color').value;const base={id:id(),x:p.x,y:p.y,source:null};
  if(tool==='text'){
   const txt=prompt('Location label:');if(!txt?.trim())return;checkpoint();current.objects.push({...base,kind:'text',text:txt.slice(0,180),fontSize:28,color});changed();render();
@@ -287,9 +290,11 @@ function updateObjectVisual(obj){
  if(!node)return;
  if(obj.kind==='stamp')node.setAttribute('transform',`translate(${obj.x} ${obj.y}) rotate(${obj.rotation||0}) scale(${obj.scale||1})`);
  else if(obj.kind==='shape')node.setAttribute('transform',`translate(${obj.x} ${obj.y}) rotate(${obj.rotation||0}) scale(${obj.w} ${obj.h})`);
- else if(obj.kind==='text'){node.setAttribute('x',obj.x);node.setAttribute('y',obj.y)}
+ else if(obj.kind==='text'){node.setAttribute('x',obj.x);node.setAttribute('y',obj.y);node.setAttribute('transform',`rotate(${obj.rotation||0} ${obj.x} ${obj.y})`)}
  else if(obj.kind==='stroke')node.setAttribute('points',obj.points.map(p=>p.join(',')).join(' '));
 }
+/* Default navigation: drag empty space (or an unselected object) to pan.
+   Double-click enables an object for moving; a blank click deselects it. */
 function pointerDown(e){
  if(!current||e.button!==0)return;
  if(tool==='erase'){
@@ -297,21 +302,25 @@ function pointerDown(e){
   e.preventDefault();checkpoint();current.objects=current.objects.filter(o=>o.id!==obj.id);
   if(selectedId===obj.id)selectedId=null;changed();render();return;
  }
- if(tool==='select'){
-  const obj=objectTarget(e);selectedId=obj?.id||null;selectVisual();
-  if(obj){gesture={type:'move',obj:obj.id,start:pos(e),origin:obj.kind==='stroke'?{points:structuredClone(obj.points)}:{x:obj.x,y:obj.y},moved:false};}
- }else if(tool==='pan')gesture={type:'pan',px:e.clientX,py:e.clientY,initial:{...pan}};
- else if(tool==='pencil'){
+ if(tool==='navigate'){
+  const obj=objectTarget(e);lastClickedObjectId=obj?.id||null;
+  if(obj&&obj.id===selectedId){
+   gesture={type:'move',obj:obj.id,start:pos(e),origin:obj.kind==='stroke'?{points:structuredClone(obj.points)}:{x:obj.x,y:obj.y},moved:false};
+  }else{
+   gesture={type:'pan',px:e.clientX,py:e.clientY,initial:{...pan},moved:false,clickedObject:obj?.id||null};
+  }
+ }else if(tool==='pencil'){
   const p=pos(e);draft={id:id(),kind:'stroke',points:[[p.x,p.y]],color:$('draw-color').value,width:3,source:null};
   gesture={type:'draw',preview:makeObject(draft,true)};$('stage').append(gesture.preview);
  }
  if(!gesture)return;
  e.preventDefault();$('stage').setPointerCapture(e.pointerId);
- if(tool==='pan')$('stage').classList.add('dragging');
 }
 function pointerMove(e){
  if(!current||!gesture)return;
  if(gesture.type==='pan'){
+  if(!gesture.moved&&Math.hypot(e.clientX-gesture.px,e.clientY-gesture.py)<3)return;
+  gesture.moved=true;$('stage').classList.add('dragging');
   const rect=$('stage-wrap').getBoundingClientRect();
   pan.x=gesture.initial.x-(e.clientX-gesture.px)/Math.max(1,rect.width)*gesture.initial.w;
   pan.y=gesture.initial.y-(e.clientY-gesture.py)/Math.max(1,rect.height)*gesture.initial.h;
@@ -334,14 +343,40 @@ function pointerMove(e){
 function pointerUp(e){
  if(!gesture)return;
  if(e?.pointerId!=null&&$('stage').hasPointerCapture(e.pointerId))$('stage').releasePointerCapture(e.pointerId);
+ let needsRender=false;
  if(gesture.type==='draw'&&draft){
-  if(draft.points.length===1){draft.points.push([draft.points[0][0]+1,draft.points[0][1]+1])}
-  checkpoint();current.objects.push(draft);draft=null;changed();
- }else if(gesture.type==='move'&&gesture.moved)changed();
- gesture=null;$('stage').classList.remove('dragging');render();
+  if(draft.points.length===1)draft.points.push([draft.points[0][0]+1,draft.points[0][1]+1]);
+  checkpoint();current.objects.push(draft);draft=null;changed();needsRender=true;
+ }else if(gesture.type==='move'&&gesture.moved){changed();needsRender=true;}
+ else if(gesture.type==='pan'&&!gesture.moved&&selectedId){selectedId=null;needsRender=true;}
+ gesture=null;$('stage').classList.remove('dragging');
+ // Keep SVG nodes stable across both clicks: replacing them here swallows native double-click events.
+ if(needsRender)render();
 }
 function wheel(e){if(!current)return;e.preventDefault();const pointer=pos(e),scale=e.deltaY>0?1.15:.87;const nw=Math.max(current.canvas.width*.01,Math.min(current.canvas.width*10,pan.w*scale)),nh=pan.h*nw/pan.w;const rect=$('stage').getBoundingClientRect(),fx=(e.clientX-rect.left)/rect.width,fy=(e.clientY-rect.top)/rect.height;pan={x:pointer.x-fx*nw,y:pointer.y-fy*nh,w:nw,h:nh};render()}
-function adjustSelected(action){if(!current||!selectedId)return notify('Select an annotation first.');const obj=current.objects.find(o=>o.id===selectedId);if(!obj)return;checkpoint();if(action==='rotate'){obj.rotation=((obj.rotation||0)+15)%360}else if(action==='duplicate'){const next=structuredClone(obj);next.id=id();next.x=(next.x||0)+30;next.y=(next.y||0)+30;if(next.kind==='stroke')next.points=next.points.map(p=>[p[0]+30,p[1]+30]);current.objects.push(next);selectedId=next.id}else if(action==='delete'){current.objects=current.objects.filter(o=>o.id!==selectedId);selectedId=null}else{const factor=action==='enlarge'?1.2:.8;if(obj.kind==='stamp')obj.scale=(obj.scale||1)*factor;else if(obj.kind==='shape'){obj.w*=factor;obj.h*=factor}else if(obj.kind==='text')obj.fontSize=(obj.fontSize||30)*factor;else if(obj.kind==='stroke')obj.width=(obj.width||3)*factor}changed();render()}
+function pasteAnnotation(offset){
+ if(!current||!copiedAnnotation)return;
+ checkpoint();const next=copyAnnotation(copiedAnnotation,id(),offset);
+ current.objects.push(next);selectedId=next.id;changed();render();
+}
+function copySelected(){
+ if(!current||!selectedId)return false;
+ const obj=current.objects.find(o=>o.id===selectedId);if(!obj)return false;
+ copiedAnnotation=structuredClone(obj);pasteCount=0;notify('Annotation copied. Press Ctrl+V to paste.');return true;
+}
+function adjustSelected(action){
+ if(action==='copy'){if(!copySelected())notify('Double-click an annotation to select it first.');return;}
+ if(action==='paste'){if(!copiedAnnotation)return notify('Copy an annotation first.');pasteAnnotation(30*(++pasteCount));return;}
+ if(!current||!selectedId)return notify('Double-click an annotation to select it first.');
+ const obj=current.objects.find(o=>o.id===selectedId);if(!obj)return;
+ checkpoint();
+ if(action==='rotate')obj.rotation=((obj.rotation||0)+15)%360;
+ else if(action==='duplicate'){
+  const next=copyAnnotation(obj,id());current.objects.push(next);selectedId=next.id;
+ }else if(action==='delete'){current.objects=current.objects.filter(o=>o.id!==selectedId);selectedId=null}
+ else if(action==='enlarge'||action==='shrink')resizeAnnotation(obj,action);
+ changed();render();
+}
 function zoom(f){if(!current)return;pan={x:pan.x+pan.w*(1-f)/2,y:pan.y+pan.h*(1-f)/2,w:pan.w*f,h:pan.h*f};render()}
 async function makeNewMap(){if(!work){notify('Choose a folder first');return}$('dlg-new').showModal()}
 function askImage(){return new Promise(resolve=>{const inp=$('pick-image');inp.value='';inp.onchange=()=>resolve(inp.files?.[0]||null);inp.click();})}
@@ -453,15 +488,39 @@ $('emergency-save').onclick=emergency;
 $('backup-full').onclick=fullBackup;
 $('import-recovery').onclick=()=>$('pick-recovery').click();
 $('pick-recovery').onchange=e=>{const f=e.target.files?.[0];if(f)restoreEmergency(f);e.target.value=''};
-$('stage').addEventListener('click',e=>{if(gesture||['pencil','select','pan'].includes(tool))return;clickStage(e)});
-$('stage').addEventListener('dblclick',e=>{if(tool!=='select'||!current)return;const target=e.target.closest('[data-id]');const o=current.objects.find(x=>x.id===target?.getAttribute('data-id'));if(!o||o.kind!=='text')return;const input=prompt('Edit map label:',o.text);if(input===null||!input.trim()||input===o.text)return;checkpoint();o.text=input.slice(0,180);changed();render()});
-$('draw-color').addEventListener('change',()=>{if(tool!=='select'||!selectedId||!current)return;const o=current.objects.find(x=>x.id===selectedId);if(!o)return;checkpoint();if(o.kind==='shape')o.fill=$('draw-color').value;else if(o.kind==='text'||o.kind==='stamp'||o.kind==='stroke')o.color=$('draw-color').value;changed();render()});
+$('stage').addEventListener('click',e=>{if(gesture||!['text','stamp'].includes(tool))return;clickStage(e)});
+$('stage').addEventListener('dblclick',e=>{
+ if(tool!=='navigate'||!current)return;
+ const target=e.target.closest('[data-id]'),targetId=target?.getAttribute('data-id')||lastClickedObjectId,o=current.objects.find(x=>x.id===targetId);
+ if(!o)return;
+ e.preventDefault();selectedId=o.id;selectVisual();
+ if(o.kind==='text'){
+  const input=prompt('Edit map label:',o.text);
+  if(input!==null&&input.trim()&&input!==o.text){checkpoint();o.text=input.slice(0,180);changed();render();}
+ }
+});
+$('draw-color').addEventListener('change',()=>{if(tool!=='navigate'||!selectedId||!current)return;const o=current.objects.find(x=>x.id===selectedId);if(!o)return;checkpoint();if(o.kind==='shape')o.fill=$('draw-color').value;else if(o.kind==='text'||o.kind==='stamp'||o.kind==='stroke')o.color=$('draw-color').value;changed();render()});
 $('toggle-grid').onclick=()=>{if(!current)return;checkpoint();current.canvas.grid=!current.canvas.grid;changed();render()};
 $('stage').addEventListener('pointerdown',pointerDown);$('stage').addEventListener('pointermove',pointerMove);$('stage').addEventListener('pointerup',pointerUp);$('stage').addEventListener('pointercancel',pointerUp);$('stage').addEventListener('wheel',wheel,{passive:false});
 window.addEventListener('resize',()=>{if(current)render()});
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
-document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!document.querySelector('dialog[open]')){e.preventDefault();e.shiftKey?redo():undo()}});
-changeTool('select');
+document.addEventListener('keydown',e=>{
+ if(document.querySelector('dialog[open]'))return;
+ if(e.target?.closest?.('input, textarea, select, [contenteditable="true"]'))return;
+ if(e.key==='Escape'){
+  if(tool!=='navigate'){e.preventDefault();changeTool('navigate')}
+  else if(selectedId){e.preventDefault();selectedId=null;render()}
+  return;
+ }
+ if(!current||!(e.ctrlKey||e.metaKey)||e.altKey)return;
+ const key=e.key.toLowerCase();
+ if(key==='z'){e.preventDefault();e.shiftKey?redo():undo()}
+ else if(key==='y'){e.preventDefault();redo()}
+ else if(key==='c'&&selectedId){e.preventDefault();copySelected()}
+ else if(key==='v'&&copiedAnnotation){e.preventDefault();pasteAnnotation(30*(++pasteCount))}
+ else if(key==='d'&&selectedId){e.preventDefault();adjustSelected('duplicate')}
+});
+changeTool('navigate');
 if(window.parent===window)$('back-to-bookshelf').classList.add('hidden');
 
 window.CBWorldMapsSession={canClose:()=>!dirty&&!busy};

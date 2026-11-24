@@ -1,33 +1,39 @@
-# Character Bookshelf v4.2.2 - World Maps Startup Hotfix
+# Character Bookshelf v4.2.3 — World Maps Interaction & Adaptive Bookshelf
 
-**Status:** Source-complete QA candidate. This is a hotfix for the **v4.2.1** broken World Maps screen, not a redesign or data migration.
+**Status:** Complete source QA candidate built on the v4.2.2 startup hotfix. **Not deployed** or validated with your live writer library. No novel/character/map data migration is planned.
 
-## What was broken
-The v4.2.1 `world-maps.js` file had an unclosed function call in the pencil pointer-move handler. That single JavaScript syntax error prevented the World Maps ES module from loading at all. Consequences: `No folder connected`, `Opening your writer's World Maps...`, disabled New Map, unresponsive controls, and maps that appeared missing. The issue did not itself delete map data.
+## Changes in this release
 
-## What's fixed
-- Corrected the missing `)` in the drawing code.
-- Added a visible startup failure message rather than showing a frozen editor when scripts do not load.
-- Prevented a mismatched or failed embedded Bookshelf connection from suggesting a different folder picker; Back to Bookshelf remains available.
-- Close other toolbar menus when one is opened and close the menu after choosing an action.
-- New cache-busting version strings and updated version/release notes.
-- Kept original map schema (1), local folder layout, annotation files, image files, and all recovery behavior unchanged.
+**World Maps editor**
+- The usual state is navigation: drag empty space to pan and use the mouse wheel to zoom. Separate Select/Pan toolbar buttons are removed.
+- Double-click an existing stamp/shape/label to select it; double-click text to immediately edit existing wording. The selection remains until a blank click or Escape. Drag a selected object to reposition it.
+- Pencil, Text, Stamp and Eraser remain optional modes. Click the active mode again or press Escape to return to navigation.
+- Fit to Screen is a continuously visible toolbar action. Resize/rotate via Object menu; reversible resizing keeps a fixed center and reduces rounding drift.
+- Ctrl+C / Ctrl+V copy and paste a selected map object with its visual properties; Ctrl+D duplicates; Object menu alternatives also provided. Pasted/duplicated objects have independent IDs; Undo/Redo remains available.
 
-## Installation (do not overwrite your writing library)
-1. **Before deployment:** make a full writer ZIP backup, a separate copy of the library, and retain the complete v4.2.1 and v4.1.3 release ZIPs for rollback.
-2. Extract this package and publish **all** extracted files, preserving relative paths, to the existing GitHub Pages repository. Do **not** upload the ZIP itself, only `world-maps.js`, or omit `world-maps-core.mjs`.
-3. Wait for GitHub Pages publication and hard-refresh Edge/Chrome (Ctrl+Shift+R). Confirm the Character Bookshelf footer shows **v4.2.2**.
-4. Open your existing Stern Lake novel, choose **World Maps**, and confirm the title shows **World Maps / Stern Lake**, the list loads, and **New Map** is enabled. Do **not** use `Choose Local Folder` from a disconnected map editor to look for existing book maps.
-5. Confirm your prior map(s) appear. Open one; test draw, stamp, erase, Undo/Redo, save, and reopening using a **disposable map** before using important writing data.
-6. If the map list remains empty despite a connected editor, check that the exact same writer profile and selected library folder are in use. The maps are expected under that writer's `world-maps/maps/` directory; do not remove anything before diagnosis.
+**Writer bookshelf**
+- Cover dimensions adapt to collection density and screen width. Books are grouped on shelf rows, respecting linked-series groups where feasible, with tighter vertical spacing.
+- Optional Spine View button toggles compact spines and returns to Covers. The choice is saved *per writer* in local browser preferences when allowed; it does not modify novel JSON.
+- Recovery-size indicator now reports decimal MB with both numbers converted correctly. Internal RAM limit still 384 MiB (= 402.65 MB); internal storage data unchanged.
 
-## Data safety
-The hotfix makes no changes to prior novel or character JSON schemas and does not migrate/delete existing `world-maps/` files. The repair works by restoring the code path that reads the existing files. Normal backups include map image files; volatile RAM recovery excludes source-image bytes, as before.
+## Installation and rollback
 
-## QA performed
-- World Maps source parsed successfully as an ES module using `node --input-type=module --check` (the correct mode; earlier v4.2.1 checks missed this error).
-- Existing map data model: **9/9 tests passed**.
-- Browser smoke test in an isolated `about:blank` Chromium frame with **mock local-folder handles and a mock digest**: connected a writer, created a map, placed a stamp, drew pencil stroke, erased stamp, saved and reopened map after recreating the frame. No page errors in that test.
-- Browser smoke does **not** establish live GitHub Pages, real File System Access permissions, real USB behavior, large image imports, Android, full pointer regressions or PDF print correctness. The testing environment blocks direct `localhost` navigation; those still need real-device QA.
+1. **Back up your real writing library first** using the app's writer ZIP backup and separately copy the entire local writer folder. Keep your known-good full v4.2.2 ZIP.
+2. Extract the entire new release package, then publish the *contents* to your existing GitHub Pages repository, preserving folder structure. Do not publish only the changed JS or the ZIP by itself.
+3. Confirm GitHub Pages has finished deploying, hard-refresh in Edge/Chrome (Ctrl+Shift+R), and check that the footer says **v4.2.3**.
+4. First try the optional Spine View and a *disposable* World Map in a test writer (the separate Claire demo library is suitable). Test navigation, selection, text editing, copy/paste, resizing, save/reopen and exports.
+5. Reopen one existing map in the *same* writer and selected library folder. The map file format is unchanged. Never select a different folder or start deleting maps as a way to recover a supposedly missing map.
+6. If needed, redeploy the full v4.2.2 code ZIP. Because this release does not intentionally change file schemas, code rollback is designed to remain compatible. Still preserve a separate data backup.
 
-See `QA_REPORT.md` and `QA_REPORT.pdf` for scope and limitations.
+## Data and safety boundaries
+
+- Source images and editable map annotations remain separate. Existing map image exclusion from *volatile* RAM recovery remains intact, while normal writer ZIP backup includes images subject to the existing scanning limits.
+- Copying between series and novels remains explicit and independent. Combining annotations is still user-initiated, with preview and Undo.
+- No cloud database or required sign-in is added; character/novel/series JSON schema and existing legacy manifest names are preserved.
+- New bookshelf preference is browser-local rather than writer-file content; in a different browser the view may default to Covers.
+
+## QA evidence and limitations
+
+`node --test tests/*.mjs` passes **20/20** (map model, startup guard and new interaction helper checks). Additional isolated Playwright/Chromium tests exercised a simulated World Maps session with in-memory folder objects: create map, stamp placement/selection, copy/paste, drag-to-pan, Fit to Screen and edit an existing label; a separate simulated bookshelf DOM render used 30 books in Covers and Spines. These tests did **not** use the actual USB drive, real browser File System Access dialogs, deployed GitHub Pages, real Android touch events, actual user maps or comprehensive backup/restore failure scenarios.
+
+See `QA_REPORT.md` / `QA_REPORT.pdf` for the exact test scope. The package is a **QA candidate** until validated on your hardware.

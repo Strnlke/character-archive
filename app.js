@@ -62,9 +62,10 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.2.2';
+const APP_VERSION = '4.2.3';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
+  ['4.2.3','Map Interaction & Adaptive Bookshelf',['Drag to pan by default; double-click a saved map object to select or edit it','Copy/paste/duplicate map objects with Ctrl+C, Ctrl+V and Ctrl+D; fixed-center reversible resizing','Fit to Screen stays visible without a Select/Pan toolbar mode','Adaptive bookshelf cover density with optional remembered spine view','RAM recovery indicator now uses correctly converted decimal MB units']],
   ['4.2.2','World Maps Startup Hotfix',['Fixed a syntax error that blocked the entire World Maps editor from loading','Added visible startup/connection diagnostics and safer folder-picker behavior','Kept the existing editable map files, storage schema and recovery model unchanged']],
   ['4.1.3','Mobile Interface Update',['Mobile-only compact application menu with visible save status','Responsive bookshelf spacing, horizontal recent-work cards, and touch-friendly books','Novel actions, character gallery and editor adapted for small screens','Manuscript, notes, series and timeline controls adapted for mobile','Desktop styles, storage behavior and library format remain unchanged']],
   ['4.1.2','Character Development & Manuscript Notes',['Generic arc prompts for new characters; existing profiles keep their original questions and gain a freeform arc-type field','Drag-and-drop import zones for DOCX, PDF, TXT and reviewed character JSON','Manuscript annotations and quote-based relocation, printable margin-note exports for TXT/DOCX','Novel-wide notes, custom character tags and gallery filters','Live RAM recovery usage, inline novel-title editing and desktop button alignment']],
@@ -249,8 +250,8 @@ function renderStorageStatus() {
     ['Original location',memoryRecovery.disconnected?'Unavailable / needs attention':state.root?.name||'Not connected'],
     ['Last verified write',memoryRecovery.lastVerified?formatMoment(memoryRecovery.lastVerified):'Not yet verified'],
     ['Pending file writes',String(memoryRecovery.pending.size)],
-    ['RAM snapshot',summary+' · '+memoryRecovery.files.size+' files · '+(memoryRecovery.bytes/1048576).toFixed(1)+' MiB'],
-    ['Snapshot limits',Math.round(RECOVERY_LIMIT/1048576)+' MiB / '+RECOVERY_FILE_LIMIT+' files'],
+    ['RAM snapshot',summary+' · '+memoryRecovery.files.size+' files · '+(memoryRecovery.bytes/1000000).toFixed(2)+' MB'],
+    ['Snapshot limits',(RECOVERY_LIMIT/1000000).toFixed(2)+' MB / '+RECOVERY_FILE_LIMIT+' files'],
     ['Snapshot details',memoryRecovery.partialReason||'All accessible files captured'],
     ['Last storage error',memoryRecovery.lastFailure||'None']
   ];
@@ -1223,9 +1224,10 @@ function cleanGalleryUrls() {
   for (const url of state.galleryUrls) URL.revokeObjectURL(url);
   state.galleryUrls = [];
 }
-function makeBook(novel, index) {
+function makeBook(novel, index, mode='covers') {
   const tile = el('div', 'bookTile');
   const button = el('button', 'bookCover bookVariant' + (index % 6));
+  if(mode==='spines')button.title=novel.name;
   button.type = 'button';
   button.setAttribute('aria-label', 'Open ' + novel.name + ' characters');
   const cover = el('span','bookFront');
@@ -1238,7 +1240,7 @@ function makeBook(novel, index) {
   remove.title = 'Delete book: ' + novel.name;
   remove.setAttribute('aria-label', 'Delete book ' + novel.name);
   remove.addEventListener('click', () => void deleteBook(novel.id));
-  const manuscript = el('button','manuscriptShelfButton','▤ Manuscript');
+  const manuscript = el('button','manuscriptShelfButton',mode==='spines'?'▤':'▤ Manuscript');
   manuscript.type='button';manuscript.title='Open the read-only manuscript for '+novel.name;
   manuscript.addEventListener('click',async()=>{
     if(state.novel?.id!==novel.id)await chooseNovel(novel.id);
@@ -1250,6 +1252,7 @@ function makeBook(novel, index) {
     const position=series.bookIds.indexOf(novel.id)+1;
     const seriesLink=el('button','bookSeriesLink','◇ '+series.name);
     seriesLink.type='button';
+    if(mode==='spines')seriesLink.textContent='◇';
     seriesLink.title='Open '+series.name+' series · Book '+position+' of '+series.bookIds.length;
     seriesLink.setAttribute('aria-label',seriesLink.title);
     seriesLink.addEventListener('click',()=>{
@@ -1261,6 +1264,64 @@ function makeBook(novel, index) {
   }
   return tile;
 }
+const BOOKSHELF_VIEW_PREF_PREFIX='character-bookshelf-shelf-v423:';
+const bookshelfViewSession=new Map();
+let bookshelfResizePending=false;
+function bookshelfMode(){
+ if(!state.writer)return 'covers';
+ if(bookshelfViewSession.has(state.writer.id))return bookshelfViewSession.get(state.writer.id);
+ try{return localStorage.getItem(BOOKSHELF_VIEW_PREF_PREFIX+state.writer.id)==='spines'?'spines':'covers'}catch{return 'covers'}
+}
+function setBookshelfMode(mode){
+ if(!state.writer)return;
+ bookshelfViewSession.set(state.writer.id,mode);
+ try{localStorage.setItem(BOOKSHELF_VIEW_PREF_PREFIX+state.writer.id,mode)}catch{/* Retain session choice even when storage is blocked. */}
+ $('bookshelfView').dataset.shelfMode=mode;
+ renderBookshelfCards(mode);
+}
+function bookshelfGeometry(mode){
+ const host=$('shelfBooks');
+ const viewport=Math.max(300,host.getBoundingClientRect().width||host.clientWidth||900);
+ // Match shelf padding and side gutters, leaving the ordinary bookshelf layout intact.
+ const available=Math.max(240,viewport-78);
+ if(mode==='spines'){
+  const gap=9,preferred=49,cols=Math.max(3,Math.min(20,Math.floor((available+gap)/(preferred+gap))));
+  return {capacity:cols,width:Math.max(37,Math.min(55,Math.floor((available-gap*(cols-1))/cols)))};
+ }
+ const count=state.novels.length;
+ const preferred=count>=24?112:count>=13?128:count>=7?142:155;
+ const gap=count>=13?12:16;
+ const capacity=Math.max(2,Math.min(10,Math.ceil((available+gap)/(preferred+gap))));
+ const width=Math.max(86,Math.min(155,Math.floor((available-gap*(capacity-1))/capacity)));
+ return {capacity,width};
+}
+function renderBookshelfCards(mode=bookshelfMode()){
+ if(!state.writer)return;
+ const container=$('shelfBooks');if(!container)return;
+ cleanCoverUrls();
+ const geometry=bookshelfGeometry(mode);
+ const button=$('bookshelfViewModeBtn');
+ if(button){button.textContent=mode==='spines'?'▦ Cover view':'▥ Spine view';button.title=mode==='spines'?'Switch to full book covers':'Switch to compact book spines';button.setAttribute('aria-pressed',String(mode==='spines'));}
+ $('bookshelfView').dataset.shelfMode=mode;
+ container.style.setProperty('--shelf-card-width',geometry.width+'px');
+ container.style.setProperty('--shelf-cover-height',Math.round(geometry.width*1.38)+'px');
+ container.replaceChildren();
+ if(!state.novels.length){
+  const empty=el('div','noBooks');empty.append(el('span','bigGlyph','▤'),el('p','','Your first book belongs here.'));container.append(empty);return;
+ }
+ let i=0;
+ for(const group of renderShelfSeries(geometry.capacity)){
+  const shelf=el('div','bookShelf'),books=el('div','bookShelfRow');
+  for(const novel of group.books)books.append(makeBook(novel,i++,mode));
+  shelf.append(books,el('div','shelfPlank'));container.append(shelf);
+ }
+}
+function scheduleBookshelfLayout(){
+ if(bookshelfResizePending)return;
+ bookshelfResizePending=true;
+ requestAnimationFrame(()=>{bookshelfResizePending=false;if(state.writer&&!$('bookshelfView').classList.contains('hidden'))renderBookshelfCards()});
+}
+window.addEventListener('resize',scheduleBookshelfLayout,{passive:true});
 async function showBookshelf() {
   if (!(await flush())) { toast('Please save your changes before returning to your bookshelf.', true); return; }
   if (!state.writer) return;
@@ -1270,20 +1331,7 @@ async function showBookshelf() {
   $('shelfTitle').textContent = state.writer.name + "'s Bookshelf";
   $('shelfSubtitle').textContent = state.novels.length ?
     'Choose a novel to explore its characters.' : 'Your shelves are empty. Add a novel to begin.';
-  const container = $('shelfBooks'); container.replaceChildren();
-  if (!state.novels.length) {
-    const empty = el('div', 'noBooks');
-    empty.append(el('span', 'bigGlyph','▤'), el('p','', 'Your first book belongs here.'));
-    container.append(empty);
-  } else {
-    let i=0;
-    for (const group of renderShelfSeries()){
-      const shelf=el('div','bookShelf');
-      const books=el('div','bookShelfRow');
-      for(const novel of group.books)books.append(makeBook(novel,i++));
-      shelf.append(books,el('div','shelfPlank'));container.append(shelf);
-    }
-  }
+  renderBookshelfCards();
   setActiveSidebarNavigation('bookshelf');
   setWorkspaceView('bookshelf');
   void renderRecentlyWorkedOn();
@@ -3616,6 +3664,7 @@ function init() {
   $('newNovelBtn').onclick = createNovel;
   $('bookshelfNewNovelBtn').onclick = createNovel;
   $('bookshelfBtn').onclick = () => void showBookshelf();
+  $('bookshelfViewModeBtn').onclick=()=>setBookshelfMode(bookshelfMode()==='spines'?'covers':'spines');
   $('novelCharactersBtn').onclick = () => void showCharacters();
   $('novelBackToShelfBtn').onclick = () => void showBookshelf();
   $('novelViewNewCharacterBtn').onclick = createCharacter;
