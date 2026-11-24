@@ -1,9 +1,15 @@
 # Release History — Character Bookshelf
 
+## v4.2.0 — World Maps (Release B)
+- Adds novel and series World Maps launchers, locally stored maps/overlays and limited recovery/backup integration.
+- Blank canvas, optional grid and shapes; imported licensed image and independent annotations.
+- Text, pencil, stamps/clusters, object editing, undo/redo.
+- Independent series/novel copies; combined versions with all/select, preview, duplicate protection and revision.
+- PNG/SVG/Print-to-PDF; Unlinked source re-link or blank/reset choices.
+
 ## v4.1.4 — Interface Refinement (Release A)
-- Slim topbar; Storage Status remains accessible from footer, with save/recovery visible.
-- Import Character now opens compact upload / drag-and-drop menu; existing review safeguards preserved.
-- No file schema migration.
+- Slim header; redundant top Storage Status hidden, footer status retained.
+- Import Character upload/drop popover; reviewed imports preserved.
 
 ## Previous releases (retained source)
 

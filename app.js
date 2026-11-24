@@ -62,10 +62,9 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.1.4';
+const APP_VERSION = '4.2.0';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
-  ['4.1.4','Interface Refinements',['Storage Status remains available in the footer; compact top navigation retained','Character JSON drag-and-drop moved under Import Character; existing review safeguards preserved','No library format or data migration']],
   ['4.1.3','Mobile Interface Update',['Mobile-only compact application menu with visible save status','Responsive bookshelf spacing, horizontal recent-work cards, and touch-friendly books','Novel actions, character gallery and editor adapted for small screens','Manuscript, notes, series and timeline controls adapted for mobile','Desktop styles, storage behavior and library format remain unchanged']],
   ['4.1.2','Character Development & Manuscript Notes',['Generic arc prompts for new characters; existing profiles keep their original questions and gain a freeform arc-type field','Drag-and-drop import zones for DOCX, PDF, TXT and reviewed character JSON','Manuscript annotations and quote-based relocation, printable margin-note exports for TXT/DOCX','Novel-wide notes, custom character tags and gallery filters','Live RAM recovery usage, inline novel-title editing and desktop button alignment']],
   ['4.1.1','Unified Series Bookshelf',['Linked novels now share ordinary bookshelf rows with standalone novels','Small clickable series labels on linked covers lead straight to the correct Series page','No character, timeline, or novel files are migrated or modified']],
@@ -160,11 +159,11 @@ async function removeTrackedEntry(directory,name,options) {
   await directory.removeEntry(name,options);
   if(path)recoveryRemove(path,!!options?.recursive);
 }
-// Imported manuscripts are reference copies; their bytes do not belong in
-// volatile recovery. Only the metadata stays in memory. Normal ZIP writer
-// backups still include every manuscript.
+// Imported manuscripts and World Maps background images are reference copies.
+// Exclude their bytes from volatile RAM recovery; keep JSON/annotations.
+// Normal writer ZIP backups still include these source files.
 function isManuscriptReferencePath(path){
-  return /(?:^|\/)manuscript-[^/]+\.(?:docx|pdf|txt)$/i.test(String(path||''));
+  return /(?:^|\/)manuscript-[^/]+\.(?:docx|pdf|txt)$/i.test(String(path||'')) || /(?:^|\/)world-maps\/images\//i.test(String(path||''));
 }
 function eligibleRecoveryFileCount(){return memoryRecovery.files.size;}
 async function captureRecoverySnapshot() {
@@ -215,7 +214,7 @@ async function captureRecoverySnapshot() {
   }catch(error){finished=false;reason=error.message;}
   if(scan===memoryRecovery.scanId){
     memoryRecovery.complete=finished;
-    memoryRecovery.partialReason=finished?'Imported manuscript copies deliberately excluded.':reason;
+    memoryRecovery.partialReason=finished?'Imported manuscript and map source images deliberately excluded.':reason;
     memoryRecovery.scanning=false;
     if(!finished)console.warn('Character Bookshelf recovery snapshot incomplete:',reason);
     renderStorageStatus();
@@ -244,7 +243,7 @@ function storageFailed(error) {
 }
 function renderStorageStatus() {
   const host=$('storageStatusDetails');if(!host)return;
-  const summary=memoryRecovery.scanning?'Building snapshot':memoryRecovery.complete?'Complete (except manuscript copies)':memoryRecovery.active?'Partial':'Unavailable';
+  const summary=memoryRecovery.scanning?'Building snapshot':memoryRecovery.complete?'Complete (except reference images/files)':memoryRecovery.active?'Partial':'Unavailable';
   const items=[
     ['Original location',memoryRecovery.disconnected?'Unavailable / needs attention':state.root?.name||'Not connected'],
     ['Last verified write',memoryRecovery.lastVerified?formatMoment(memoryRecovery.lastVerified):'Not yet verified'],
@@ -3531,7 +3530,7 @@ function openTutorial(){
   if(!dialog.open)dialog.showModal();
 }
 function popOutTutorial(){
-  const win=window.open('tutorial.html?v=4.1.4','characterBookshelfTutorial','width=1100,height=780,resizable=yes,scrollbars=yes');
+  const win=window.open('tutorial.html?v=4.2.0','characterBookshelfTutorial','width=1100,height=780,resizable=yes,scrollbars=yes');
   if(win){win.focus();$('tutorialDialog').close();}
   else toast('Pop-up blocked. Allow pop-ups for this site or use the tutorial in this window.',true);
 }

@@ -78,7 +78,8 @@ function renderSeries(){
   const actions=el('div','seriesHeaderActions');
   const rename=el('button','quiet','Rename');rename.type='button';rename.onclick=()=>void renameSeries(series.id);
   const remove=el('button','dangerOutline','Delete series links');remove.type='button';remove.onclick=()=>void deleteSeriesLinks(series.id);
-  actions.append(rename,remove);headline.append(info,actions);body.append(headline);
+  const maps=el('button','quiet','♧ World maps');maps.type='button';maps.onclick=()=>window.CBWorldMapsHost?.open('series',series.id);
+  actions.append(maps,rename,remove);headline.append(info,actions);body.append(headline);
 
   const row=el('div','seriesBooks');
   for(const [i,id] of series.bookIds.entries()){

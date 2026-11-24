@@ -1,15 +1,18 @@
-# Character Bookshelf v4.1.4 — QA report
+# Character Bookshelf v4.2.0 — QA report
 
 Baseline: actual uploaded v4.1.3 source ZIP. Status: packaged but NOT deployed, NOT tested on physical USB/Android.
 
 ## Confirmed tests
-- **Source verification** — Unzipped and inspected the actual v4.1.3 source package (HTML, CSS, JS, tutorial and QA).
-- **Syntax checks** — All JavaScript source files parsed using Node.js --check.
-- **Chromium interaction** — Original Characters page keeps the working `characterImportFile` input, moves its original drag/drop zone to a popover, opens on click and closes with Escape.
-- **Navigation** — Topbar Storage Status is hidden; the existing footer Storage Status button and recovery meter remain in the DOM.
-- **Browser console** — No uncaught JavaScript page errors in the isolated DOM test.
+- **Original source** — Inspected exact uploaded v4.1.3 ZIP and based all changes on its full source; Release B includes Release A.
+- **JavaScript static checks** — Node --check run across all application and module scripts; no syntax errors.
+- **Pure data logic** — 9/9 Node unit tests passed: schema, shape templates, image-free recovery, independent copies, selected/all merges, duplicate detection, family/fingerprint restrictions, cluster count.
+- **Standalone editor fixture** — Headless Chromium mocked-folder workflow: new blank map, shape, forest stamp, undo and redo, copy, combined copy, selectable merge source, annotations-only SVG export; no page errors.
+- **Embedded writer fixture** — Headless Chromium same-origin simulated bridge: series editor opens, local writer folder connected without second picker, blank map with grid and shape saved, forest stamp saved, annotations-only SVG export, copy into a linked novel. Map JSON/index recorded in RAM recovery; image excluded.
+- **UI refinement fixture** — Characters import popover, footer Storage Status, live topbar state and escape-to-close passed in isolated Chromium DOM test.
 
 ## Limitations
-- The import save/duplicate-review path was not tested with realistic imported profiles in this new run; existing implementation is reused.
-- Real Chrome/Edge folder picker, USB disconnection, writer ZIP restore, physical Android and live GitHub Pages were not exercised.
-- Screen captures are disposable test fixtures, not real user data.
+- The browser used in this test environment does not permit normal direct file://, HTTPS test-host or localhost navigation. DOM/iframe tests therefore used in-memory same-origin simulated contexts and a directory-handle mock. They are not a real-device acceptance test.
+- The imported-image/relink path, PDF browser print layout, map limits, storage failure paths, orphan map relinking, full ZIP/restore and real USB disconnect/reconnect were not exhaustively exercised.
+- External copyright terms remain the writer’s responsibility; users must have rights to use and reproduce underlying images.
+- The pre-existing v4.1.3 75 responsive tests were not rerun as an entire regression suite. B integration regression was narrow and feature focused.
+- Detailed mobile drawing and Android File System Access behavior require acceptance testing on actual hardware.
