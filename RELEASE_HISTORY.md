@@ -1,5 +1,10 @@
 # Release History — Character Bookshelf
 
+## v4.2.8 — Map Import Cancel Hotfix (QA candidate)
+
+- Cancel in Import Saved Map closes the dialog without validating hidden required fields.
+- No changes to map copying, source files, storage, other dialogs, or mobile UI.
+
 ## v4.2.7 — Import Saved Editable Maps Hotfix (QA candidate)
 - Adds an explicit **Map files → Import Saved Map** workflow to bring editable maps from a different writer/library folder into the active writer's selected novel or series.
 - Accepts a source folder containing `world-maps/maps/` plus its image directory, or one map JSON file. Image-backed folder imports copy images only after SHA-256 source fingerprint validation; JSON-only imports remain Unlinked until re-linked.

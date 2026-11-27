@@ -593,6 +593,7 @@ $('choose-source-map-json').onclick=()=>$('pick-map-json').click();
 $('pick-map-json').onchange=e=>{const file=e.target.files?.[0];if(file)void chooseExternalMapJSON(file);e.target.value=''};
 $('import-map-choice').onchange=showImportMapPreview;
 $('import-map-scope').onchange=importTargetOptions;
+$('import-map-cancel').onclick=()=>{if(!importingExternalMap)$('dlg-import-map').close('cancel')};
 $('import-map-confirm').onclick=importExternalMap;
 $('import-recovery').onclick=()=>$('pick-recovery').click();
 $('pick-recovery').onchange=e=>{const f=e.target.files?.[0];if(f)restoreEmergency(f);e.target.value=''};

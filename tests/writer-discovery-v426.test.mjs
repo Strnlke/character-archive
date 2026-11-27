@@ -31,7 +31,7 @@ test('UI offers scan, folder choose, drag/drop, and a review dialog',()=>{
  assert.match(app,/getAsFileSystemHandle/);
 });
 test('version is updated and all existing map source paths remain unchanged',()=>{
- assert.match(app,/APP_VERSION = '4\.2\.7'/);
- assert.match(html,/app\.js\?v=4\.2\.7/);
- assert.match(html,/maps-host-v420\.js\?v=4\.2\.7/);
+ assert.match(app,/APP_VERSION = '4\.2\.8'/);
+ assert.match(html,/app\.js\?v=4\.2\.8/);
+ assert.match(html,/maps-host-v420\.js\?v=4\.2\.8/);
 });

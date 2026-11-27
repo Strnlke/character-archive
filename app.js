@@ -62,9 +62,10 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.2.7';
+const APP_VERSION = '4.2.8';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
+  ['4.2.8','Saved Map Import Cancel Hotfix',['Cancel now closes the saved-map import dialog even before selecting a source or completing required fields','Importing and map data behavior unchanged; no library migration']],
   ['4.2.7','Import Existing Editable Maps',['Import complete saved maps from another writer folder or individual map JSON','Preserve annotations and copy source images with SHA-256 verification when available','Create independent maps without overwriting either library; missing images remain Unlinked']],
   ['4.2.6','Writer Folder Discovery Hotfix',['Find existing, unregistered writer folders copied into the selected library','Review and register detected writer folders without overwriting their files','Choose or drop a separate writer folder to copy as a new writer; no automatic merging']],
   ['4.2.5','Original Cover Titles & Compact Labels',['Restored titles inside generated book covers in normal and compact cover views','Compact title labels appear only when books scale down; standard covers keep their original appearance','Uploaded cover art is unchanged and spine titles still read vertically','Full-title hover, keyboard-focus and touch previews remain available; no saved-data changes']],

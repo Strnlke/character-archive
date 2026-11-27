@@ -1,7 +1,7 @@
-# Character Bookshelf v4.2.7 — Release File Manifest
+# Character Bookshelf v4.2.8 - Complete File Manifest
 
-Prepared November 27, 2026. Paths are relative to the extracted ZIP root.
-**File count:** 63 (including this manifest). The manifest itself is excluded from hashes to avoid self-reference.
+Paths are relative to ZIP root.
+Total files (including manifest): 65
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
@@ -11,30 +11,32 @@ Prepared November 27, 2026. Paths are relative to the extracted ZIP root.
 | `Character_Bookshelf_Project_Knowledge_v4.2.5.md` | 45837 | `c3bbf1a4327c8996792756824fc1ec25ee3e727f2ad101bfcc63af6a21fb7446` |
 | `Character_Bookshelf_Project_Knowledge_v4.2.6.md` | 47783 | `7ae5ffa553a3812c880dfba316f56c517d1a4539f931de22789a96f2aac1df40` |
 | `Character_Bookshelf_Project_Knowledge_v4.2.7.md` | 50016 | `3824d4a97fb2dd0e4bc514bc83a4a4b3edeb54be5f3c3b1a874fa78e76052c1f` |
-| `QA_REPORT.md` | 2694 | `042b739feb2fd8363d974ea8edcdedc6cca9ee3a871d8929a5173af1a95f8e48` |
-| `QA_REPORT.pdf` | 3333 | `88bcb6ecff645769a528a1d7104ce5b5821076829fa09cc083fb619d12d9ab3f` |
-| `README.md` | 5685 | `58cca90ce14bdd92e61887c14c6be4ad8548d74c1a91aabd930639c673eafc59` |
-| `RELEASE_HISTORY.md` | 13747 | `4b8ea402c5fa857c9ca4f113c88069a6a1c3f83b646ea685171d05d20bb88e55` |
+| `Character_Bookshelf_Project_Knowledge_v4.2.8.md` | 1163 | `2822490ac360b6add09be157fc4d5a6c851e565520401a546cd2520664b11933` |
+| `QA_REPORT.md` | 2615 | `218129b687f3c659bdcb41cf8eb820425d7ef2d2fa68b1a7f6ef7b9d9612ec2f` |
+| `QA_REPORT.pdf` | 2841 | `0a906329ad0f88ed7f95dd68e1d76ff6f2ec4934d8d66302755823987926af5f` |
+| `README.md` | 1943 | `37cb65f40bab40739ee81168e049f7f29fffae0f9594bc442db9797d26a79715` |
+| `RELEASE_HISTORY.md` | 13974 | `5d5c960fa15354c99b0c0b6483e186002ea080a191d406d3157caed2ce61223b` |
 | `THIRD_PARTY_LICENSES.md` | 1272 | `a73c12e27ee4e512525d5c4fc46747a3d9a1e8f4d58ad618a8ed64cf7bf85822` |
-| `app.js` | 344397 | `461f92f0e1c098c5d16eced570cd19741762d3cf75b90c8d3287aa16af3be298` |
+| `app.js` | 344620 | `831289c01f35f13e01cdf4ed98382b202abab299ddd3905e62be71a860c757fa` |
 | `bookshelf-v423.css` | 3432 | `078251c2ff6ef8186f95a35b72bac99282114ebc8043137ac36b006f6c83825b` |
 | `bookshelf-v424.css` | 2735 | `23c809bf825cd12c3e73675eaca74d9468a9c0e487e5e9827a3ae61121d7afe5` |
 | `features-v412.js` | 30458 | `c01a68bd9aea88697caf45c852c4f47513bfed3dcda118eb68e1463efdd17475` |
-| `index.html` | 43395 | `dff396e956332d9a70fa37f4ff04ac78d2f7b5626bb93a15d529cd15d1f1e93c` |
+| `index.html` | 43395 | `d6811de9dcaa4160ad04a67b9033dbdf486f6a99a860d7c4a0460e44d302bd4f` |
 | `manuscript-v41.js` | 7569 | `a37ad4fc97077aa3743044d2752ab1995ac299b6729fa1d81024b581203b7834` |
 | `maps-host-v420.css` | 374 | `6058e2445f9c8995d4e322c149e9ac39a3f8c576b769bfe76933f02d57446dfb` |
-| `maps-host-v420.js` | 3450 | `b93faf2aaa68577f1e3f417bf0dd5dae29e15d48424dfcd06ea5cf558ec4acc2` |
+| `maps-host-v420.js` | 3450 | `e93ee3bc102b8ae946ac40c52422ad229b7a060e91bef9b30e65c6ce972d163c` |
 | `mobile-v413.css` | 9965 | `15dff71b928a767700453645a8a3ac266c37626982fc8bbbca782e49a7f410e8` |
 | `mobile-v413.js` | 2397 | `8ebe665a34eaf526231d660141282332c2b50b4c4c5bb848ce2e560100bb55fc` |
 | `series-v41.js` | 21108 | `4ac80820bfc6eaa61478fe1b6fc7987d59d6ba59ec8e476129fa4b06d1178547` |
 | `styles.css` | 60230 | `307b7267ef574e32891d0ab2f87bf1cfe110ae8870569de510a7b5849dd6a639` |
+| `tests/cancel-import-v428.test.mjs` | 754 | `831a2cd613a3e596737bad9ce3dee69af9ff90a0ec11630b96551e43c0a229e9` |
 | `tests/cover-title-v425.test.mjs` | 922 | `a8bedbde1e8efbd32dca5b6c53267bd070c6a30202354d3695ac010b97cd6281` |
 | `tests/import-saved-maps-v427.test.mjs` | 4418 | `37abb48f806246be2e4e9a351aed805f8d30ccb45d3b8479eaa55078b1b55884` |
 | `tests/interactions-v423.test.mjs` | 3425 | `75a9a4e7a07ffcb312bf615c61519818fa20dbb44f2089c16f8576dd11ea356e` |
-| `tests/map-startup-v422.test.mjs` | 1111 | `70533e6917e91761f3241c522eb47b2c175048ba3c0090d35f02a2f82752f250` |
+| `tests/map-startup-v422.test.mjs` | 1111 | `6b4d5f1d2df0dac7c9ebf9b7021c6939ce08ca8caebdf044497d61aeaa073234` |
 | `tests/maps-core-v421.test.mjs` | 2880 | `a7dea0bd84a37590e1f7b3ea80573f6922812b51c757563a9ad966f0b9b87687` |
-| `tests/visual-v425.test.mjs` | 2022 | `d901878c698ae3406c34b63aa63866e4215c5895d47c69b6beb4d34c1a02fe22` |
-| `tests/writer-discovery-v426.test.mjs` | 2031 | `d823f42daef974d0b44d1cd0b23a7afec1906cbf5e88aebec7384304db73cea2` |
+| `tests/visual-v425.test.mjs` | 2022 | `93f4ca2b0ed413f9d82029709a6d15585e45004dadee2a8c1963873aabd03d7b` |
+| `tests/writer-discovery-v426.test.mjs` | 2031 | `15f83451abf733af111a81ed87a63acb53a0bfb892b0536b41d285bc88ef349f` |
 | `tutorial-assets/bookshelf-compact-v425-qa.png` | 642810 | `67974867f2dd4a3e7596cec1c368416edf9d64fca4b4154c5027ed82098bfcb2` |
 | `tutorial-assets/bookshelf-covers-v424-qa.png` | 67825 | `77245aa3e207d8e90788fb64d4c8b668910bc5a7eaac85661463325ecc33b605` |
 | `tutorial-assets/bookshelf-spines-v424-qa.png` | 142146 | `0d02f972f0c788c9ab47b07d3403c77ef12e599b8bbdb529a696c0c88da88221` |
@@ -57,13 +59,13 @@ Prepared November 27, 2026. Paths are relative to the extracted ZIP root.
 | `tutorial-assets/world-maps-v422-qa.png` | 58743 | `39d50b5a809ecf40ec266ce41057f18e79d8f842214a3b7b7c09902e8d4feadb` |
 | `tutorial-assets/world-maps-v423-qa.png` | 63436 | `b9f7e7ebad458bd5fd91cbcaac477ac07f81faaa7a120400c58ce37da45116e4` |
 | `tutorial-assets/world-maps-v424-qa.png` | 70830 | `b96923b0d13007d419375bebcaf6416cf474ff96d5c6a5754e061ed5fb98a630` |
-| `tutorial.html` | 35884 | `57028252e86f32f5c25b6c2bc3428a807efc43b4293298c17cb296d60477d1e2` |
+| `tutorial.html` | 36058 | `6c7d76900e4ec07be7e3678a826f0f988b7f06c9569d4c1f589eadc70bc3b464` |
 | `ui-v414.css` | 2304 | `ec4ea230ae49a80e20fe0af60667924c1ec3f1ae8e6c9c992f283c9a309b0b2b` |
 | `ui-v414.js` | 2172 | `ba6b086be6dcec2910b61c20762b7754d288493058406e8d4244d7c38583c30b` |
 | `world-maps-core.mjs` | 4292 | `dc1d02ce2c9a29a64ed1a8a28136724eab4001ea34fdbabb7c974360f2aa1335` |
 | `world-maps-import-v427.mjs` | 4152 | `436d0ed0c315160edc1ceb04f5f53dc68d2c4616c253a0609089392618334534` |
 | `world-maps-interactions-v423.mjs` | 999 | `6f4bbae6e495d726d5aad01b28c80f92df03c00c60212eadc41bb37c6b9a636c` |
 | `world-maps.css` | 9838 | `43c6bf1071a13ec22ee3159a11e8454b6db6a7a61fceb5c22a9f2f077c61eb69` |
-| `world-maps.html` | 13656 | `420930774a24a209518a66f961eea0328b99b94eb28fd0c179449a8378286848` |
-| `world-maps.js` | 59008 | `e86964d06dcce6e1fbbe6dfad1fda73cb78cb52e1e5a25c489d9ac66735eb8b4` |
+| `world-maps.html` | 13678 | `4c7148409da97851765c9aed29a75310e982d5611e96182780dac8038bf06b37` |
+| `world-maps.js` | 59107 | `78de8b116dd05fc6013943b9fad88a7b7b475316cca2e8d12cb4d12387084a95` |
 | `writer-discovery-v426.css` | 923 | `e714a31b7d3c4124b698b5d558a39871825a99960b0b804c3c3b8e514a93489c` |

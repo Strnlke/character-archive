@@ -33,7 +33,7 @@
 <div class="field"><label for="import-map-owner">Novel or series name</label><input id="import-map-owner" maxlength="150" required></div>
 <p class="muted small" id="import-map-preview"></p>
 </div>
-<div class="buttons"><button value="cancel">Cancel</button><button id="import-map-confirm" class="primary" type="button" disabled>Import independent copy</button></div>
+<div class="buttons"><button id="import-map-cancel" type="button">Cancel</button><button id="import-map-confirm" class="primary" type="button" disabled>Import independent copy</button></div>
 </form></dialog>
 <dialog id="dlg-export"><form method="dialog" id="form-export"><h2>Export map</h2><div class="field"><label for="export-format">Format</label><select id="export-format"><option value="png">PNG image</option><option value="svg">SVG vector image</option><option value="pdf">PDF (browser Print / Save as PDF)</option></select></div><div class="field"><label for="export-content">Content</label><select id="export-content"><option value="all">Complete map (including source image, if present)</option><option value="annotations">Annotations only (transparent background)</option></select></div><p class="muted small">Only include an imported source image when you have rights to reproduce it. Exports never change editable files.</p><div class="buttons"><button value="cancel">Cancel</button><button value="export" class="primary">Export</button></div></form></dialog>
 <dialog id="dlg-relink"><form method="dialog" id="form-relink"><h2>Missing source image</h2><p>Your editable annotations are safe, but this map's image is unlinked.</p><p class="muted small">Expected filename: <strong id="expected-filename"></strong></p><p class="muted small">Choose a matching file to restore the reference. If the fingerprint differs, the app will warn and refuse to replace it.</p><div class="buttons"><button value="cancel">Not Now</button><button value="blank">Convert to Blank (keep drawings)</button><button value="reset" class="danger">Start Over</button><button value="link" class="primary">Choose Image</button></div></form></dialog>
@@ -55,4 +55,4 @@
   if(!window.CBWorldMapsSession && event.target instanceof HTMLScriptElement)showFailure('a required script failed to load');
  },true);
 })();
-</script><script type="module" src="world-maps.js?v=4.2.7"></script></body></html>
+</script><script type="module" src="world-maps.js?v=4.2.8"></script></body></html>
