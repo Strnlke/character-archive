@@ -1,5 +1,6 @@
 import {SCHEMA,id,newMap,duplicateMap,compatible,combine,recoverMap,stripImageBytes,validate,STAMPS,SHAPES} from './world-maps-core.mjs';
 import {resizeAnnotation,copyAnnotation} from './world-maps-interactions-v423.mjs';
+import {discoverSavedMaps,discoverSavedMapJSON,prepareIndependentMap,verifySourceImage} from './world-maps-import-v427.mjs';
 /* World Maps: additive map data in current Bookshelf writer folder; no legacy migration. */
 const $ = x => document.getElementById(x);
 const NS='http://www.w3.org/2000/svg';
@@ -248,8 +249,8 @@ async function setImageUrl(){if(imageUrl){URL.revokeObjectURL(imageUrl);imageUrl
 async function selectMap(mid){if(current?.id===mid)return;await saveNow();if(dirty){notify('Unsaved changes must be resolved before switching maps. Export emergency recovery if needed.',9000);return}
  try{current=await loadMap(mid);history=[];future=[];previewObjects=[];selectedId=null;copiedAnnotation=null;pasteCount=0;await setImageUrl();fit();renderList();$('emergency-save').disabled=false;status(`Loaded • ${current.title}`)}catch(e){notify(e.message,9000)}
 }
-async function saveNew(m,image=null){validate(m);if(records.some(r=>r.id===m.id))throw Error('Duplicate map identity');
- if(image){await saveImageFor(m,image)}
+async function saveNew(m,image=null,originalImageFilename=null){validate(m);if(records.some(r=>r.id===m.id))throw Error('Duplicate map identity');
+ if(image){await saveImageFor(m,image);if(originalImageFilename)m.baseImage.filename=originalImageFilename}
  await writeMap(m);current=m;history=[];future=[];selectedId=null;copiedAnnotation=null;pasteCount=0;dirty=false;sessionRecovery.set(m.id,stripImageBytes(m));$('filter-scope').value=m.scope;await setImageUrl();fit();renderList();$('emergency-save').disabled=false;status('Saved • new map');
 }
 async function saveImageFor(map,file){const mime=fileMime(file);if(!['image/png','image/jpeg','image/webp'].includes(mime))throw Error('Only PNG, JPEG, and WebP are supported');if(file.size>64*1024*1024)throw Error('Image too large (64 MiB limit)');
@@ -468,6 +469,98 @@ async function fullBackup(){if(!work)return;await saveNow();if(dirty)return;try{
  for await (const [filename,handle] of (await revDir()).entries()){if(handle.kind==='file'){const f=await handle.getFile();await add('revisions/'+filename,await f.arrayBuffer())}}
  const zip=zipStored(entries);downloadBlob(zip,`Character_Bookshelf_World_Maps_Backup_${new Date().toISOString().slice(0,10)}.zip`);notify('Full ZIP backup downloaded. Store it separately from your working folder.');
  }catch(e){notify('Backup failed: '+e.message,9500)}finally{status('Connected • local folder')}}
+/* v4.2.7 — importing an editable saved map from a different storage location.
+   Source handles are used read-only; imports always create independent IDs. */
+let externalMapChoices=[];
+let importingExternalMap=false;
+function openSavedMapImport(){
+ if(!work)return notify('Connect a library folder before importing a saved map.');
+ externalMapChoices=[];$('import-map-fields').classList.add('hidden');
+ $('import-map-source-status').textContent='No source selected.';
+ $('import-map-confirm').disabled=true;
+ $('dlg-import-map').showModal();
+}
+function importTargetOptions(){
+ if(!attached)return;
+ const input=$('import-map-owner');let select=$('import-map-owner-select');if(!select){select=document.createElement('select');select.id='import-map-owner-select';select.setAttribute('aria-label','Destination novel or series');input.insertAdjacentElement('afterend',select)}
+ const options=ownerOptions($('import-map-scope').value);select.replaceChildren();
+ for(const entry of options)select.add(new Option(entry.name,entry.id));
+ select.disabled=!options.length;select.classList.remove('hidden');input.classList.add('hidden');
+ const selected=attached.context.scope===$('import-map-scope').value?attached.context.id:null;
+ if(selected&&options.some(e=>e.id===selected))select.value=selected;
+}
+function selectedImportChoice(){return externalMapChoices[Number($('import-map-choice').value)]||null}
+function showImportMapPreview(){
+ const selection=selectedImportChoice();if(!selection)return;
+ const m=selection.map;
+ $('import-map-title').value=`${m.title} (Imported)`.slice(0,150);
+ if(!attached)$('import-map-scope').value=m.scope;
+ importTargetOptions();
+ if(!attached)$('import-map-owner').value=String(m.owner||'').slice(0,150);
+ const imageStatus=!m.baseImage?'No source image (blank map)':
+    (selection.imageFile?'Source image found; fingerprint will be verified before copying.':
+    'Source image unavailable; annotations can be imported as an Unlinked map and re-linked later.');
+ const count=records.filter(r=>r.scope===$('import-map-scope').value&&r.title===m.title).length;
+ $('import-map-preview').textContent=`${m.objects.length} editable annotations · ${m.canvas.width}×${m.canvas.height}. ${imageStatus} ${count?'A map with this original title already exists; this import creates a separate copy.':''}`;
+ $('import-map-confirm').disabled=false;
+}
+function setImportMapSources(entries){
+ externalMapChoices=entries;$('import-map-choice').replaceChildren();
+ entries.forEach((entry,index)=>$('import-map-choice').add(new Option(`${entry.map.title} · ${entry.map.scope} · ${entry.map.objects.length} annotations`,String(index))));
+ $('import-map-source-status').textContent=`Found ${entries.length} editable map${entries.length===1?'':'s'}; original location is read-only.`;
+ $('import-map-fields').classList.remove('hidden');showImportMapPreview();
+}
+async function chooseExternalMapFolder(){
+ try{if(!('showDirectoryPicker' in window))throw Error('Choose-source-folder requires Edge or Chrome with local-folder access');
+  const chosen=await showDirectoryPicker({mode:'read'});
+  const entries=await discoverSavedMaps(chosen);setImportMapSources(entries);
+ }catch(e){if(e.name==='AbortError')return;$('import-map-source-status').textContent=e.message;notify('Map discovery failed: '+e.message,8500)}
+}
+async function chooseExternalMapJSON(file){
+ try{const entries=await discoverSavedMapJSON(file);setImportMapSources(entries)}
+ catch(e){$('import-map-source-status').textContent=e.message;notify('Map file rejected: '+e.message,9500)}
+}
+async function removeStagedImportFiles(m){
+ // Only remove the new, unregistered generated-ID files. Never touch source or existing maps.
+ const index=await readText(work,INDEX);
+ if(!index)throw Error('Cannot verify map index; leaving staged files for manual inspection');
+ const disk=JSON.parse(index);
+ if(!Array.isArray(disk.maps)||disk.maps.some(r=>r.id===m.id))throw Error('Map may be registered; leaving files untouched for safety');
+ const dirs=[[await mapDir(),`${m.id}.json`]];
+ if(m.baseImage?.storageFile)dirs.push([await imgDir(),m.baseImage.storageFile]);
+ for(const [dir,filename] of dirs){
+  try{await dir.getFileHandle(filename);await dir.removeEntry(filename);
+   if(attachedBridge&&filename.endsWith('.json'))await attachedBridge.registerMapDeletion(dir,filename);
+  }catch(e){if(e.name!=='NotFoundError')throw e}
+ }
+ records=records.filter(r=>r.id!==m.id);allMaps.delete(m.id);savedHashes.delete(`${m.id}.json`);
+}
+async function importExternalMap(){
+ if(importingExternalMap)return;
+ const source=selectedImportChoice();if(!source)return notify('Choose a saved map first');
+ const scope=$('import-map-scope').value;
+ const owner=attached?$('import-map-owner-select').value:sanitize($('import-map-owner').value);
+ const title=sanitize($('import-map-title').value);
+ if(!owner||!title)return notify('Enter a destination and title.');
+ importingExternalMap=true;$('import-map-confirm').disabled=true;
+ let map=null,attemptedWrite=false;
+ try{
+  await saveNow();if(dirty||busy)throw Error('Current map has unsaved changes. Resolve the save before importing.');
+  const original=source.map;map=prepareIndependentMap(original,{title,scope,owner});
+  const srcImage=await verifySourceImage(original,source.imageFile);
+  // A file chosen without its source folder intentionally remains Unlinked.
+  if(srcImage){const filename=`${map.id}.${original.baseImage.mime==='image/png'?'png':original.baseImage.mime==='image/webp'?'webp':'jpg'}`;
+   try{await (await imgDir()).getFileHandle(filename);throw Error('An image with the generated ID already exists; refusing overwrite')}
+   catch(e){if(e.name!=='NotFoundError')throw e}}
+  const existing=await readText(await mapDir(),`${map.id}.json`);
+  if(existing!==null)throw Error('Generated map ID already exists; refusing overwrite');
+  attemptedWrite=true;await saveNew(map,srcImage,original.baseImage?.filename||null);
+  $('dlg-import-map').close();notify(srcImage?'Editable map and its verified source image imported as an independent copy.':'Map annotations imported as an independent copy. Re-link its original source image if needed.',9500);
+ }catch(e){
+  let cleanupMessage='';if(map&&attemptedWrite){try{await removeStagedImportFiles(map)}catch(cleanErr){cleanupMessage=' Review the destination for a partially imported map before retrying: '+cleanErr.message}}
+  notify('Import failed: '+e.message+cleanupMessage,12500);
+ }finally{importingExternalMap=false;$('import-map-confirm').disabled=!selectedImportChoice()}
+}
 async function deleteMap(){if(!current)return;if(!confirm(`Delete map "${current.title}"? This cannot be undone. Create a full backup first.`))return;const m=current;try{await saveNow();if(dirty)return;const dir=await mapDir();const name=`${m.id}.json`,text=await readText(dir,name);if(!text)throw Error('Map file missing');if(await sha(new TextEncoder().encode(text))!==savedHashes.get(name))throw Error('Map changed externally; refusing delete');await dir.removeEntry(name); if(attachedBridge)try{await attachedBridge.registerMapDeletion(dir,name)}catch(e){console.warn('RAM recovery deletion registration failed',e)} // do not destroy image or revisions: manual cleanup safer
   records=records.filter(r=>r.id!==m.id);await writeIndex();allMaps.delete(m.id);savedHashes.delete(name);current=null;history=[];future=[];await setImageUrl();render();renderList();notify('Map JSON removed from index. Source image/revisions retained for safety.');}
  catch(e){notify(e.message,10000)}}
@@ -493,6 +586,14 @@ $('form-export').addEventListener('submit',e=>{if(e.submitter?.value==='export')
 $('delete-map').onclick=deleteMap;
 $('emergency-save').onclick=emergency;
 $('backup-full').onclick=fullBackup;
+$('import-saved-map').onclick=openSavedMapImport;
+$('import-saved-map-menu').onclick=openSavedMapImport;
+$('choose-source-map-folder').onclick=chooseExternalMapFolder;
+$('choose-source-map-json').onclick=()=>$('pick-map-json').click();
+$('pick-map-json').onchange=e=>{const file=e.target.files?.[0];if(file)void chooseExternalMapJSON(file);e.target.value=''};
+$('import-map-choice').onchange=showImportMapPreview;
+$('import-map-scope').onchange=importTargetOptions;
+$('import-map-confirm').onclick=importExternalMap;
 $('import-recovery').onclick=()=>$('pick-recovery').click();
 $('pick-recovery').onchange=e=>{const f=e.target.files?.[0];if(f)restoreEmergency(f);e.target.value=''};
 $('stage').addEventListener('click',e=>{if(gesture||!['text','stamp'].includes(tool))return;clickStage(e)});

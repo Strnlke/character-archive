@@ -1,5 +1,12 @@
 # Release History — Character Bookshelf
 
+## v4.2.7 — Import Saved Editable Maps Hotfix (QA candidate)
+- Adds an explicit **Map files → Import Saved Map** workflow to bring editable maps from a different writer/library folder into the active writer's selected novel or series.
+- Accepts a source folder containing `world-maps/maps/` plus its image directory, or one map JSON file. Image-backed folder imports copy images only after SHA-256 source fingerprint validation; JSON-only imports remain Unlinked until re-linked.
+- Always generates independent map/annotation IDs, previews source/destination, refuses ID overwrite, preserves original source files and never merges/synchronizes existing maps.
+- Failed writes leave the map index unchanged and attempt safe cleanup of unregistered staged files; recovery/backup formats unchanged.
+- 35/35 Node regression tests and simulated Chromium browser workflows passed; not yet validated on physical USB or live GitHub Pages.
+
 ## v4.2.6 — Writer Folder Discovery Hotfix (QA candidate)
 - Detects unregistered writer folders copied directly into the active library by validating legacy book/series metadata.
 - Writer selection gains a Scan button, external folder picker, Chromium folder drop area, and reviewed registration preview.

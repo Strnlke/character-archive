@@ -29,8 +29,8 @@ test('stamp popover only shows for selected stamps and is not inside scrollable 
  assert.match(css,/\.stamp-context\{position:absolute/);
 });
 test('versions match and no schema changes',()=>{
- assert.match(source('app.js'),/APP_VERSION = '4\.2\.6'/);
- assert.match(source('world-maps.html'),/world-maps\.js\?v=4\.2\.5/);
+ assert.match(source('app.js'),/APP_VERSION = '4\.2\.7'/);
+ assert.match(source('world-maps.html'),/world-maps\.js\?v=4\.2\.7/);
  assert.match(source('world-maps-core.mjs'),/export const SCHEMA = 1/);
- assert.match(source('index.html'),/app\.js\?v=4\.2\.6/);
+ assert.match(source('index.html'),/app\.js\?v=4\.2\.7/);
 });

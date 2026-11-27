@@ -46,7 +46,7 @@
    if(scope==='series'&&!state.series.some(s=>s.id===id)){toast('Select a series to edit its maps.',true);return;}
    if(!(await flush())){toast('Save your existing changes before opening World Maps.',true);return;}
    context={scope,id};page.hidden=false;document.body.classList.add('cb-maps-page-open');
-   frame.src='world-maps.html?v=4.2.5&session='+Date.now();
+   frame.src='world-maps.html?v=4.2.7&session='+Date.now();
  };
  const attemptClose=()=>{
    // iframe guard is synchronous: a failed write or unsaved edit blocks closing.

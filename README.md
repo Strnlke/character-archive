@@ -1,52 +1,42 @@
-# Character Bookshelf v4.2.6 — Writer Folder Discovery Hotfix
+# Character Bookshelf v4.2.7 — Import Saved Maps Hotfix
 
-**Release status:** Complete-source QA candidate, prepared November 27, 2026 from the original v4.2.5 full-release ZIP. **Scope:** Register/copy existing writer folders; no changes to novel/character/series/map data formats or the existing bookshelf/map interface.
+**Release:** QA candidate, November 27, 2026. Full application package built from v4.2.6; no library schema migration. Keep the full v4.2.6 ZIP for rollback.
 
 ## What this fixes
 
-Older versions only displayed writers listed in `character-archive-manifest.json`. Copying an individual writer folder (for example, `claire`) into an existing Character Bookshelf library did not make it appear in the writer selection screen. This hotfix finds unregistered writer folders by their existing `novel.json` / `character-bookshelf-series.json` content, **without requiring a new writer metadata file**. It also accepts an optional `character-bookshelf-writer.json` identity file if one is already present.
+**Import existing map image** in New Map accepts PNG/JPEG/WebP artwork, not an already-edited Character Bookshelf map. **Combine Annotations** only combines compatible maps already in one writer's map list. Version 4.2.6 did **not** offer a way to import a *saved editable map* from a different storage location.
 
-The new writer selection screen includes **Find copied writer folders**, **Add writer from folder**, and a folder drop target. All three show a **review and confirm** dialog before registration. No automatic merging or overwriting is performed.
+This hotfix adds **Map files → Import Saved Map…** (also under the Maps toolbar menu). It reads the source as **read-only**, previews editable map files, and imports a separate copy assigned to a novel or series in the current writer. The imported copy preserves canvas, text, drawings and stamps. When the source folder contains the original image, the image is copied with SHA-256 fingerprint verification. The original map, source image, and writer folder are not modified.
 
-## Before installing
+## How to import a map from your other folder
 
-1. Export a writer ZIP backup of each important writer, **and copy the entire existing Character Bookshelf library** to another location. Verify the copies. Keep the complete v4.2.5 release ZIP for rollback.
-2. Extract this entire v4.2.6 package and publish **all the files and subdirectories** to your GitHub Pages repository. Do not deploy just `index.html` or `app.js`.
-3. Hard-refresh Edge/Chrome (`Ctrl+Shift+R`) after the site has deployed. Check the footer says **v4.2.6**.
-4. Try the workflow first on a disposable library or Claire's demo before using the primary writing library.
+1. **Back up both libraries** first. Keep the complete v4.2.6 application package for rollback. Do not delete or move the old map folder yet.
+2. Publish the **entire** v4.2.7 ZIP's contents to your GitHub Pages app, not just `index.html`. Hard refresh Edge/Chrome with `Ctrl+Shift+R` and confirm the footer shows **v4.2.7**.
+3. Connect your **current destination writer library** in Character Bookshelf. Open the novel or series where you want the map to appear, then select **World maps**.
+4. Open the **Map files** menu at the top and choose **Import Saved Map…**.
+5. Choose **Choose source folder…** and browse to the *other location's writer folder* (the folder that contains `world-maps`), or choose the `world-maps` folder itself. You may also choose the library root containing that writer folder.
+6. Select the discovered map, review its annotation count, image status, title, and destination. The destination defaults to your currently open novel/series. Choose a new title if needed.
+7. Click **Import independent copy**. Confirm the app says the map was imported, then inspect the map canvas, drawings, labels and original image. Check **Saved** and export a fresh writer backup.
 
-## Add Claire's existing writer folder (easiest option)
+**Alternative: single JSON file.** Use **Choose map JSON…** and select a file from the source writer's `world-maps/maps/` folder. This imports its editable annotations, but **does not** include the separate source image. If it was image-backed, the new map is marked **Unlinked**. Use **Maps → Re-link Image** to select the exact original source image; its fingerprint must match. Do not choose an exported PNG/PDF; those are flat images, not editable map files.
 
-If you already copied Claire's `claire` folder **into your current library's `Character Bookshelf` directory**, alongside your existing writer folder(s):
+## Safety guarantees and limits
 
-1. Choose/open that library in the app. On **Who's writing?**, the app scans for copied writer folders. If you already have the library open, select **Switch writer** then **Find copied writer folders**.
-2. Find the result named **Claire** (expected: **30 books** when using the complete demo folder), then choose **Review & add**.
-3. Confirm that the preview points to `claire`, shows the expected number of books, and that the name is **Claire**.
-4. Choose **Register this writer**. This updates the library manifest only; the files inside the existing `claire` folder are not changed.
-5. Claire should appear as another writer, not replace your current one.
+- **Independent copy, not merge:** Every imported map and annotation gets a new identity. An existing map with a matching title is **never overwritten** and the source is not auto-synchronized. You can rename the new copy before importing.
+- **Destination:** An imported map belongs to the novel or series you explicitly select in the currently opened writer context. It never adopts the old location's novel/series IDs.
+- **Source files are read-only:** Folder discovery, JSON reading, and image verification never write to the source. Source image must pass SHA-256 verification; mismatches reject the import.
+- **Missing image:** Without the source image, annotations can still be imported as an Unlinked map. Normal writer ZIP backups continue to store original image files, while volatile RAM recovery continues to exclude them.
+- **Interrupted import:** A failed write is not registered as a map; when safe, new unregistered staged files are removed. If the destination index cannot be verified, files are left for manual inspection rather than risk deleting data.
+- **Limits:** source JSON up to 16 MiB; each source image up to 64 MiB; 500 discovered maps per folder; standard World Maps canvas and object limits still apply. Import a map **JSON** or a **folder**, not a World Maps backup ZIP. ZIP restoration is not part of this hotfix.
+- **Compatibility:** Folder selection requires a supporting version of Microsoft Edge or Chrome over a secure context. This release does not address the planned mobile layout, pinch zoom, sidebar bugs, or full profile reconciliation.
 
-**Important:** Copy only the **`claire` writer folder**, not Claire's whole `Character Bookshelf` folder and not Claire's `character-archive-manifest.json`. Do **not** replace your real library's manifest.
+## Testing performed
 
-## Add Claire directly from a separate folder
+- **35/35 Node automated tests passed** (baseline regression suite plus map discovery, safe copies, and real SHA-256 mismatch checks).
+- **Chromium DOM/browser workflow using simulated local folder handles**: complete image-backed map import; exact source-image fingerprint and name; correct object and source retention; mismatched image rejected; standalone JSON imported as Unlinked; failed destination write cleanup; destination assignment inside the integrated bookshelf iframe. No page-level JavaScript errors.
+- The browser harness uses a deterministic substitute for WebCrypto hashing because this test environment cannot load a secure origin; the actual SHA-256 comparison was tested separately using native Node WebCrypto. These are **not** real USB-drive tests.
+- **Not yet verified:** live GitHub Pages deployment, physical USB disconnects, Windows OS folder picker behavior, Android, high-volume real libraries, or external ZIP map restore.
 
-If Claire's profile is still outside the active library:
+## Rollback
 
-1. Extract `Claire_Standalone_Demo_Library.zip` somewhere safe, leaving the `claire` folder and its book subfolders intact.
-2. Open your normal Character Bookshelf library and go to **Who's writing?**.
-3. Choose **Add writer from folder**, then pick the **`claire` folder itself**, or drag that folder from File Explorer into the folder drop area (in supported Chromium browsers).
-4. Review the book count and writer name, then select **Copy & add writer**.
-5. The app copies all files, including covers and manuscripts, into a **new** folder inside your library; the source folder stays intact. It verifies copied bytes and adds the writer to the manifest only after the copy succeeds.
-
-Chrome/Edge File System Access support is required for folder picking. If folder dragging is unavailable, use the **Add writer from folder** button. If you have `Claire_Writer_Import.zip` instead, the existing **Backup & restore → Restore writer from ZIP** pathway is still available.
-
-## Safety and limitations
-
-- **No merging.** An already-used writer name must be changed before registering a separate writer. The app never reconciles conflicting changes between locations; that is a future, separate feature.
-- **No overwrite.** External imports always create a new unused destination folder; copied-in writers are only registered in the manifest after review. Creating a new writer also avoids folders copied into the library but not yet registered.
-- **Existing writer folders remain untouched** during registration. External sources remain untouched during copying. Interrupted external copies are removed when safe to do so; failures must be inspected if cleanup itself fails.
-- Detects legacy writer folders containing one or more valid book `novel.json` files, series metadata, or a supported identity marker. An empty legacy folder with no recognizable metadata cannot be positively identified automatically.
-- External folder copies are capped at 30,000 files / 512 MiB, with a depth limit; very large libraries should use established backup/restore procedures instead.
-- Tested with a **mock File System Access implementation inside Chromium**, including a full 312-file Claire folder, duplicate-name rejection, and a simulated interrupted write. Physical USB permission handling, genuine desktop drag-and-drop, GitHub deployment, Android and large-disk stress are **not yet verified**.
-- No changes to World Maps, mobile navigation, zoom, saved JSON schemas, manuscripts, or established backup/recovery logic. The mobile issues remain scheduled separately.
-
-**Rollback:** Restore the previous complete v4.2.5 application release (code only); keep all your writing files and backups. A writer registered in this release appears in older versions too, because the library manifest schema is unchanged.
+Keep both writing libraries unchanged. To revert the application, redeploy the **complete v4.2.6 code-only package** without deleting writing files. Imported maps use the existing schema 1 World Maps storage format and should remain readable in v4.2.6. Always confirm your current maps and recent saved changes before switching versions.
