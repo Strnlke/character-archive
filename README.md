@@ -1,26 +1,52 @@
-# Character Bookshelf v4.2.5 — Classic Covers & Compact Titles Hotfix
+# Character Bookshelf v4.2.6 — Writer Folder Discovery Hotfix
 
-**Status:** Full-source QA candidate, prepared November 24, 2026 from the verified complete v4.2.4 release ZIP. **UI-only update:** no changes to writer data files, save/recovery rules, imported covers, maps or manuscripts.
+**Release status:** Complete-source QA candidate, prepared November 27, 2026 from the original v4.2.5 full-release ZIP. **Scope:** Register/copy existing writer folders; no changes to novel/character/series/map data formats or the existing bookshelf/map interface.
 
-## What changed
+## What this fixes
 
-- **Standard Cover View:** Book titles are again printed on the book faces, exactly as in the classic bookshelf. The external title box is hidden when cover width is at least 150px.
-- **Compact Cover View:** When automatic adaptive sizing produces a book width **under 150px**, a small two-line title box appears above each book. The title printed on the book face stays visible, even when that lettering is too small to read easily.
-- **Uploaded covers:** Original image remains unchanged. The title box may appear in compact mode, but uploaded art is not modified or painted over.
-- **Spine View:** Titles remain vertically typeset in live HTML text, even with uploaded covers; no external title box.
-- **Full-title previews:** Brief mouse hover, keyboard focus, or touch long press still reveals the complete title. Existing series badges and delete buttons stay positioned over the cover face.
-- **World Maps:** No interaction, drawing, copying, exporting, or saving code was changed. Map scripts and model are carried forward from v4.2.4.
+Older versions only displayed writers listed in `character-archive-manifest.json`. Copying an individual writer folder (for example, `claire`) into an existing Character Bookshelf library did not make it appear in the writer selection screen. This hotfix finds unregistered writer folders by their existing `novel.json` / `character-bookshelf-series.json` content, **without requiring a new writer metadata file**. It also accepts an optional `character-bookshelf-writer.json` identity file if one is already present.
 
-## How to install
+The new writer selection screen includes **Find copied writer folders**, **Add writer from folder**, and a folder drop target. All three show a **review and confirm** dialog before registration. No automatic merging or overwriting is performed.
 
-1. Make a full writer ZIP backup **and** a separate copy of your entire selected writing-library folder before updating. Keep the v4.2.4 complete release ZIP for rollback.
-2. Extract the entire v4.2.5 ZIP; upload **all** its files and folders to the GitHub Pages repository, preserving relative paths. Do not upload just one HTML/CSS/JS file.
-3. Hard-refresh Edge/Chrome after GitHub publishes the changes (Ctrl+Shift+R). Confirm the footer displays **v4.2.5**.
-4. Test with disposable libraries first: a six-book bookshelf should show just the classic covers; Claire's 30-book demo should show compact title boxes **and** the original lettering on the book faces. Toggle Spine View and verify titles remain vertical. Check an uploaded cover, series badge, hover titles and manuscript buttons.
-5. Reopen World Maps and check basic interactions. Only after your own acceptance testing should you use the updated application with your normal writing library.
+## Before installing
 
-**Rollback:** Re-upload the previous complete v4.2.4 package. Neither release changes the saved-library schema, so this is a code-only rollback, not a substitute for a real backup.
+1. Export a writer ZIP backup of each important writer, **and copy the entire existing Character Bookshelf library** to another location. Verify the copies. Keep the complete v4.2.5 release ZIP for rollback.
+2. Extract this entire v4.2.6 package and publish **all the files and subdirectories** to your GitHub Pages repository. Do not deploy just `index.html` or `app.js`.
+3. Hard-refresh Edge/Chrome (`Ctrl+Shift+R`) after the site has deployed. Check the footer says **v4.2.6**.
+4. Try the workflow first on a disposable library or Claire's demo before using the primary writing library.
 
-## Limits
+## Add Claire's existing writer folder (easiest option)
 
-The Node and Chromium browser checks use disposable sample content, not your actual library or physical USB. No live deployment, full ZIP backup/restore stress test, Android touch test or broad map functional regression was performed for this CSS-focused hotfix. The complete tests and limits appear in `QA_REPORT.md` and `QA_REPORT.pdf`.
+If you already copied Claire's `claire` folder **into your current library's `Character Bookshelf` directory**, alongside your existing writer folder(s):
+
+1. Choose/open that library in the app. On **Who's writing?**, the app scans for copied writer folders. If you already have the library open, select **Switch writer** then **Find copied writer folders**.
+2. Find the result named **Claire** (expected: **30 books** when using the complete demo folder), then choose **Review & add**.
+3. Confirm that the preview points to `claire`, shows the expected number of books, and that the name is **Claire**.
+4. Choose **Register this writer**. This updates the library manifest only; the files inside the existing `claire` folder are not changed.
+5. Claire should appear as another writer, not replace your current one.
+
+**Important:** Copy only the **`claire` writer folder**, not Claire's whole `Character Bookshelf` folder and not Claire's `character-archive-manifest.json`. Do **not** replace your real library's manifest.
+
+## Add Claire directly from a separate folder
+
+If Claire's profile is still outside the active library:
+
+1. Extract `Claire_Standalone_Demo_Library.zip` somewhere safe, leaving the `claire` folder and its book subfolders intact.
+2. Open your normal Character Bookshelf library and go to **Who's writing?**.
+3. Choose **Add writer from folder**, then pick the **`claire` folder itself**, or drag that folder from File Explorer into the folder drop area (in supported Chromium browsers).
+4. Review the book count and writer name, then select **Copy & add writer**.
+5. The app copies all files, including covers and manuscripts, into a **new** folder inside your library; the source folder stays intact. It verifies copied bytes and adds the writer to the manifest only after the copy succeeds.
+
+Chrome/Edge File System Access support is required for folder picking. If folder dragging is unavailable, use the **Add writer from folder** button. If you have `Claire_Writer_Import.zip` instead, the existing **Backup & restore → Restore writer from ZIP** pathway is still available.
+
+## Safety and limitations
+
+- **No merging.** An already-used writer name must be changed before registering a separate writer. The app never reconciles conflicting changes between locations; that is a future, separate feature.
+- **No overwrite.** External imports always create a new unused destination folder; copied-in writers are only registered in the manifest after review. Creating a new writer also avoids folders copied into the library but not yet registered.
+- **Existing writer folders remain untouched** during registration. External sources remain untouched during copying. Interrupted external copies are removed when safe to do so; failures must be inspected if cleanup itself fails.
+- Detects legacy writer folders containing one or more valid book `novel.json` files, series metadata, or a supported identity marker. An empty legacy folder with no recognizable metadata cannot be positively identified automatically.
+- External folder copies are capped at 30,000 files / 512 MiB, with a depth limit; very large libraries should use established backup/restore procedures instead.
+- Tested with a **mock File System Access implementation inside Chromium**, including a full 312-file Claire folder, duplicate-name rejection, and a simulated interrupted write. Physical USB permission handling, genuine desktop drag-and-drop, GitHub deployment, Android and large-disk stress are **not yet verified**.
+- No changes to World Maps, mobile navigation, zoom, saved JSON schemas, manuscripts, or established backup/recovery logic. The mobile issues remain scheduled separately.
+
+**Rollback:** Restore the previous complete v4.2.5 application release (code only); keep all your writing files and backups. A writer registered in this release appears in older versions too, because the library manifest schema is unchanged.

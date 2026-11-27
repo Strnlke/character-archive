@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1018">
   <title>Character Bookshelf</title>
   <link rel="stylesheet" href="styles.css?v=4.2.3">
-  <script src="app.js?v=4.2.5" defer></script>
+  <script src="app.js?v=4.2.6" defer></script>
   <script src="series-v41.js?v=4.2.3" defer></script>
   <script src="manuscript-v41.js?v=4.2.3" defer></script>
   <script src="features-v412.js?v=4.2.3" defer></script>
@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="maps-host-v420.css?v=4.2.3">
   <link rel="stylesheet" href="bookshelf-v423.css?v=4.2.3">
   <link rel="stylesheet" href="bookshelf-v424.css?v=4.2.5">
+  <link rel="stylesheet" href="writer-discovery-v426.css?v=4.2.6">
   <script src="maps-host-v420.js?v=4.2.5" defer></script>
 </head>
 <body>
@@ -67,6 +68,15 @@
       <p>Library folder: <strong id="folderName"></strong></p>
       <div class="writergrid" id="writerGrid"></div>
       <button id="newWriterBtn" type="button" class="quiet wide">＋ Create writer profile</button>
+      <div class="writerImportTools">
+        <div class="writerImportActions">
+          <button id="scanWriterFoldersBtn" type="button" class="quiet">↻ Find copied writer folders</button>
+          <button id="chooseWriterFolderBtn" type="button" class="quiet">＋ Add writer from folder</button>
+        </div>
+        <p id="writerDiscoveryStatus" class="helper" role="status" aria-live="polite">You can copy a writer folder into this library, then scan to register it.</p>
+        <div id="unregisteredWriterList" class="unregisteredWriterList"></div>
+        <div id="writerFolderDropZone" class="writerFolderDropZone" role="group" aria-label="Drop an existing writer profile folder here">Or drop a writer folder here to copy it into this library</div>
+      </div>
       <button id="gettingStartedBtn" type="button" class="textButton">▤ Getting Started Tutorial</button>
       <p class="helper">Writer profiles organize files; they are not password-protected accounts.</p>
       <button id="reselectFolderBtn" type="button" class="textButton">Choose a different folder</button>
@@ -311,6 +321,21 @@
       <div class="dialogActions"><button id="cancelDeleteWriterBtn" class="quiet" type="button">Cancel</button><button id="confirmDeleteWriterBtn" class="dangerConfirm" type="button" disabled>Delete writer and all data</button></div>
     </div>
   </dialog>
+  <dialog id="writerFolderImportDialog" class="backupDialog" aria-labelledby="writerFolderImportHeading">
+    <div class="dialogBody">
+      <h2 id="writerFolderImportHeading">Review writer folder</h2>
+      <p id="writerFolderImportSummary"></p>
+      <p id="writerFolderImportWarning" class="helper"></p>
+      <label class="restoreNameLabel" for="writerFolderImportName">Name for the new writer
+        <input id="writerFolderImportName" type="text" maxlength="100" autocomplete="off">
+      </label>
+      <p id="writerFolderImportStatus" class="helper" role="status" aria-live="polite">Nothing has been changed.</p>
+      <div class="dialogActions">
+        <button id="cancelWriterFolderImportBtn" class="quiet" type="button">Cancel</button>
+        <button id="confirmWriterFolderImportBtn" class="primary" type="button">Add writer</button>
+      </div>
+    </div>
+  </dialog>
   <dialog id="nameDialog">
     <form method="dialog" id="nameForm" class="dialogBody">
       <h2 id="nameDialogTitle">New item</h2>
@@ -390,7 +415,7 @@
   <dialog id="revisionHistoryDialog" class="revisionHistoryDialog" aria-labelledby="revisionHistoryHeading"><div class="dialogBody"><h2 id="revisionHistoryHeading">Character Revision History</h2><p class="helper">Saved snapshots from earlier editing sessions. Restoring a revision first backs up your current profile.</p><div id="revisionHistoryList" class="revisionHistoryList"></div><div class="dialogActions"><button id="closeRevisionsBtn" type="button" class="quiet">Close</button></div></div></dialog>
   <footer class="appFooter" id="appFooter">
     <div class="footerBrand"><span class="footerSymbol" aria-hidden="true">✦</span> Character Bookshelf</div>
-    <div class="footerLinks"><button id="footerStorageBtn" type="button" class="footerLink">Storage status</button><button id="releaseNotesBtn" type="button" class="footerLink">Release notes</button><button id="footerTutorialBtn" type="button" class="footerLink">Tutorial</button><span id="footerVersion" class="footerVersion">v4.2.5</span></div>
+    <div class="footerLinks"><button id="footerStorageBtn" type="button" class="footerLink">Storage status</button><button id="releaseNotesBtn" type="button" class="footerLink">Release notes</button><button id="footerTutorialBtn" type="button" class="footerLink">Tutorial</button><span id="footerVersion" class="footerVersion">v4.2.6</span></div>
   </footer>
   <dialog id="tutorialDialog" class="tutorialDialog" aria-labelledby="tutorialDialogTitle">
     <div class="tutorialDialogBar"><strong id="tutorialDialogTitle">Getting Started · Character Bookshelf</strong><div><button id="tutorialPopBtn" type="button" class="quiet">↗ Pop out</button><button id="tutorialCloseBtn" type="button" class="primary">Close</button></div></div>

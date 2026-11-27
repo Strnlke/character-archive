@@ -62,9 +62,10 @@ function toast(message, isError = false) {
   t.classList.remove('hidden');
   toastTimer = setTimeout(() => t.classList.add('hidden'), 6000);
 }
-const APP_VERSION = '4.2.5';
+const APP_VERSION = '4.2.6';
 // Summaries verified against the release archives and their README files.
 const RELEASE_HISTORY = [
+  ['4.2.6','Writer Folder Discovery Hotfix',['Find existing, unregistered writer folders copied into the selected library','Review and register detected writer folders without overwriting their files','Choose or drop a separate writer folder to copy as a new writer; no automatic merging']],
   ['4.2.5','Original Cover Titles & Compact Labels',['Restored titles inside generated book covers in normal and compact cover views','Compact title labels appear only when books scale down; standard covers keep their original appearance','Uploaded cover art is unchanged and spine titles still read vertically','Full-title hover, keyboard-focus and touch previews remain available; no saved-data changes']],
   ['4.2.4','Readable Bookshelf & Contextual Stamp Controls',['Readable title ribbons above covers and full-title hover/focus/long-press previews','Spine titles retain their vertical orientation with uploaded cover artwork','Contextual stamp resize/rotate tools appear only for a selected stamp without changing the map viewport','No map-file migration or change to recovery and backup behavior']],
   ['4.2.3','Map Interaction & Adaptive Bookshelf',['Drag to pan by default; double-click a saved map object to select or edit it','Copy/paste/duplicate map objects with Ctrl+C, Ctrl+V and Ctrl+D; fixed-center reversible resizing','Fit to Screen stays visible without a Select/Pan toolbar mode','Adaptive bookshelf cover density with optional remembered spine view','RAM recovery indicator now uses correctly converted decimal MB units']],
@@ -937,6 +938,7 @@ function validateManifest(manifest) {
   }
 }
 async function selectFolder() {
+  if(writerFolderBusy){toast('Finish importing the writer before changing libraries.',true);return;}
   $('folderError').classList.add('hidden');
   if (!window.isSecureContext || typeof window.showDirectoryPicker !== 'function') {
     $('folderError').textContent = 'Folder access is unavailable. Open this application in current Chrome or Edge using its HTTPS GitHub Pages address (or localhost).';
@@ -968,6 +970,7 @@ async function selectFolder() {
     status(existing ? 'Existing library opened' : 'Character Bookshelf folder created');
     renderWriterCards();
     setStage('writer');
+    void scanForWriterFolders();
     toast(existing ? 'Existing library opened: ' + root.name + '.' : 'Created the Character Bookshelf folder.');
     if (routeToRestore) await restoreNavigation(routeToRestore);
   } catch (error) {
@@ -991,6 +994,276 @@ function renderWriterCards() {
     tile.append(button,del);host.append(tile);
   }
 }
+/* v4.2.6 — discover a writer's existing folder without changing its contents.
+   Writer identity has historically lived only in the library manifest, so
+   legacy folders are identified by validated novel.json / series metadata.
+   This intentionally DOES NOT reconcile or merge two writer profiles. */
+let pendingWriterFolder = null;
+let writerFolderBusy = false;
+let writerFolderScanSerial = 0;
+const WRITER_FOLDER_COPY_MAX_BYTES = 512 * 1024 * 1024;
+const WRITER_FOLDER_COPY_MAX_FILES = 30000;
+
+function suggestedWriterFolderName(folderName) {
+  return (String(folderName).replace(/[-_]+/g,' ').replace(/\s+/g,' ').trim() || 'Imported Writer')
+    .replace(/\b[a-z]/g, s=>s.toUpperCase()).slice(0,100);
+}
+async function inspectWriterFolder(folderHandle) {
+  if(!folderHandle || folderHandle.kind!=='directory')throw Error('Choose a writer folder, not a file.');
+  // A whole Character Bookshelf library is not an individual writer folder.
+  try {await folderHandle.getFileHandle('character-archive-manifest.json');
+    throw Error('This is a complete library folder. Choose the individual writer folder inside it.');
+  } catch(error){if(error.name!=='NotFoundError')throw error;}
+  let marker=null,hasSeries=false,bookCount=0,bookIds=new Set();
+  try {
+    marker=await readJSON(await folderHandle.getFileHandle('character-bookshelf-writer.json'));
+    if(marker?.type!=='character-bookshelf-writer'||typeof marker.name!=='string'||
+       !cleanName(marker.name)||typeof marker.id!=='string'||!cleanName(marker.id))
+      throw Error('Invalid character-bookshelf-writer.json in this folder.');
+  }catch(error){if(error.name!=='NotFoundError')throw error;}
+  try {
+    const series=await readJSON(await folderHandle.getFileHandle('character-bookshelf-series.json'));
+    if(series?.type!=='character-bookshelf-series'||!Array.isArray(series.series))
+      throw Error('Invalid character-bookshelf-series.json in this folder.');
+    hasSeries=true;
+  }catch(error){if(error.name!=='NotFoundError')throw error;}
+  for await(const [name, entry] of folderHandle.entries()) {
+    if(entry.kind!=='directory')continue;
+    try {
+      const book=await readJSON(await entry.getFileHandle('novel.json'));
+      if(book?.type!=='character-archive-novel'||typeof book.id!=='string'||!book.id||
+         typeof book.name!=='string'||!cleanName(book.name))
+        throw Error('Invalid book metadata in '+name+'/novel.json.');
+      if(bookIds.has(book.id))throw Error('Duplicate book IDs found in writer folder.');
+      bookIds.add(book.id);bookCount++;
+    }catch(error){if(error.name!=='NotFoundError')throw error;}
+  }
+  if(!bookCount&&!hasSeries&&!marker)throw Error('No recognizable writer data. Expected book folders containing novel.json, or writer series metadata.');
+  return { name:cleanName(marker?.name)||suggestedWriterFolderName(folderHandle.name),
+    originalId:marker?.id||null, books:bookCount,hasSeries };
+}
+async function scanForWriterFolders() {
+  if(!state.root||writerFolderBusy)return;
+  const activeRoot=state.root,scan=++writerFolderScanSerial;
+  const host=$('unregisteredWriterList'),message=$('writerDiscoveryStatus');
+  $('scanWriterFoldersBtn').disabled=true;
+  host.replaceChildren();message.textContent='Checking for unregistered writer folders…';
+  let found=0,invalid=0;
+  try {
+    const registered=new Set((state.manifest?.writers||[]).map(w=>w.folder.toLocaleLowerCase()));
+    for await(const [name,entry] of activeRoot.entries()) {
+      if(scan!==writerFolderScanSerial||activeRoot!==state.root)return;
+      if(entry.kind!=='directory'||registered.has(name.toLocaleLowerCase()))continue;
+      let profile;
+      try {profile=await inspectWriterFolder(entry);} catch(error) {
+        // Ordinary folders are not writers. Corrupt-looking writer folders remain untouched.
+        if(!/No recognizable writer data/.test(error.message))invalid++;
+        continue;
+      }
+      found++;
+      const tile=el('div','unregisteredWriter');
+      const description=el('span','',`${profile.name} · ${profile.books} book${profile.books===1?'':'s'} · folder: ${name}`);
+      const button=el('button','quiet','Review & add');button.type='button';
+      button.onclick=()=>void previewWriterFolder(entry,true);
+      tile.append(description,button);host.append(tile);
+    }
+    message.textContent=found?`${found} unregistered writer folder${found===1?'':'s'} found. Review each before adding.`:
+      'No unregistered writer folders found. Copy one into this library, or choose a folder to import.';
+    if(invalid)message.textContent+=` ${invalid} unreadable or invalid folder${invalid===1?' was':'s were'} skipped; no files changed.`;
+  } catch(error) {message.textContent='Could not scan writer folders: '+error.message;}
+  finally {if(scan===writerFolderScanSerial)$('scanWriterFoldersBtn').disabled=false;}
+}
+async function sourceInsideLibrary(folderHandle) {
+  if(!state.root||typeof state.root.resolve!=='function')return null;
+  const route=await state.root.resolve(folderHandle);
+  if(route===null)return null;
+  if(route.length===0)throw Error('Select a writer folder, not the active library itself.');
+  if(route.length!==1)throw Error('Choose a writer folder at the top level of the library, or an external writer folder.');
+  return route[0];
+}
+async function previewWriterFolder(folderHandle,knownInside=false) {
+  if(!state.root||writerFolderBusy)return;
+  try {
+    if(!(await flush()))throw Error('Save your changes before importing a writer.');
+    const inside=knownInside?folderHandle.name:await sourceInsideLibrary(folderHandle);
+    if(inside && state.manifest.writers.some(w=>w.folder.toLowerCase()===inside.toLowerCase()))
+      throw Error('This writer folder is already registered in your library.');
+    const profile=await inspectWriterFolder(folderHandle);
+    if(profile.originalId && state.manifest.writers.some(w=>w.id===profile.originalId))
+      throw Error('This writer ID already exists in your library. Automatic merging is not supported.');
+    pendingWriterFolder={handle:folderHandle,insideFolder:inside,profile,root:state.root};
+    $('writerFolderImportSummary').textContent=`${inside?'Existing folder in this library':'External folder to copy'}: ${folderHandle.name} · ${profile.books} book${profile.books===1?'':'s'}${profile.hasSeries?' · series data found':''}.`;
+    $('writerFolderImportWarning').textContent=inside?
+      'Only the library manifest will be updated. This folder and its books will not be altered. No merging or overwriting.':
+      'The source will stay untouched. The entire folder, including covers and manuscripts, will be copied to a NEW folder. No merging or overwriting.';
+    $('writerFolderImportName').value=profile.name;
+    $('writerFolderImportStatus').textContent='No changes have been made.';
+    $('confirmWriterFolderImportBtn').textContent=inside?'Register this writer':'Copy & add writer';
+    $('writerFolderImportDialog').showModal();
+  }catch(error){pendingWriterFolder=null;toast('Cannot add writer folder: '+error.message,true);}
+}
+function closeWriterFolderPreview(){
+  if(writerFolderBusy)return;
+  pendingWriterFolder=null;
+  $('writerFolderImportDialog').close();
+}
+async function chooseWriterFolderForImport() {
+  if(!state.root||writerFolderBusy)return;
+  if(typeof window.showDirectoryPicker!=='function'){
+    toast('Folder selection is unavailable. Use Chrome or Edge on the HTTPS site or localhost.',true);return;
+  }
+  try {
+    const directory=await window.showDirectoryPicker({mode:'read'});
+    await previewWriterFolder(directory);
+  }catch(error){if(error.name!=='AbortError')toast('Cannot select writer folder: '+error.message,true);}
+}
+async function preflightWriterCopy(folder) {
+  const budget={files:0,bytes:0};
+  async function walk(dir,depth) {
+    if(depth>30)throw Error('Writer folder is nested too deeply to import safely.');
+    for await(const [name,entry] of dir.entries()) {
+      if(!name||name==='.'||name==='..'||name.includes('/')||name.includes('\\')||/[\x00-\x1f]/.test(name))
+        throw Error('Unsafe file or folder name in writer directory.');
+      if(entry.kind==='directory')await walk(entry,depth+1);
+      else if(entry.kind==='file'){
+        budget.files++;
+        budget.bytes+=(await entry.getFile()).size;
+        if(budget.files>WRITER_FOLDER_COPY_MAX_FILES||budget.bytes>WRITER_FOLDER_COPY_MAX_BYTES)
+          throw Error('Writer folder exceeds the 30,000-file or 512 MB copy limit. No files were copied.');
+      }else throw Error('Unsupported entry found in writer folder.');
+    }
+  }
+  await walk(folder,0);
+  return budget;
+}
+// Only writes into a newly-created empty folder. Use verified byte copies
+// instead of the normal edited-file save path (which performs expensive
+// per-file recovery-path resolution). The original writer stays untouched.
+async function copyFreshWriterFolder(source,dest) {
+  for await(const [name,entry] of source.entries()) {
+    if(entry.kind==='directory') {
+      const child=await dest.getDirectoryHandle(name,{create:true});
+      await copyFreshWriterFolder(entry,child);
+    }else if(entry.kind==='file') {
+      const original=new Uint8Array(await (await entry.getFile()).arrayBuffer());
+      const target=await dest.getFileHandle(name,{create:true});
+      const writable=await target.createWritable();
+      try {await writable.write(original);await writable.close();}
+      catch(error){try{await writable.abort();}catch{}throw error;}
+      const check=new Uint8Array(await (await target.getFile()).arrayBuffer());
+      if(!sameBytes(check,original))throw Error('Copied file did not verify: '+name);
+    }
+  }
+}
+async function commitWriterRegistration(manifest,writer) {
+  const current=await readJSON(await state.root.getFileHandle('character-archive-manifest.json'));
+  validateManifest(current);
+  if(JSON.stringify(current)!==JSON.stringify(manifest))
+    throw Error('The writer list changed outside this tab. Refresh your library before importing.');
+  if(current.writers.some(w=>w.name.toLocaleLowerCase()===writer.name.toLocaleLowerCase()||
+    w.folder.toLocaleLowerCase()===writer.folder.toLocaleLowerCase()||w.id===writer.id))
+    throw Error('This writer name, folder, or ID already exists. No merge was performed.');
+  const next={...current,writers:[...current.writers,writer]};
+  await putJSON(state.root,'character-archive-manifest.json',next);
+  const saved=await readJSON(await state.root.getFileHandle('character-archive-manifest.json'));
+  if(JSON.stringify(saved)!==JSON.stringify(next))throw Error('Writer registration could not be verified. Inspect library before trying again.');
+  state.manifest=next;
+}
+async function confirmWriterFolderImport() {
+  const pending=pendingWriterFolder;
+  if(!pending||!state.root||writerFolderBusy)return;
+  const button=$('confirmWriterFolderImportBtn');
+  const sourceRoot=state.root;
+  let created=null,registered=false;
+  writerFolderBusy=true;button.disabled=true;
+  try {
+    if(pending.root!==sourceRoot)throw Error('The active library changed. Start again.');
+    if(!(await flush()))throw Error('Save changes before adding a writer.');
+    const name=cleanName($('writerFolderImportName').value);
+    if(!name||name.length>100||/[\x00-\x1f]/.test(name))throw Error('Enter a valid writer name (100 characters maximum).');
+    const manifest=await readJSON(await sourceRoot.getFileHandle('character-archive-manifest.json'));
+    validateManifest(manifest);
+    if(JSON.stringify(manifest)!==JSON.stringify(state.manifest))throw Error('The writer list changed on disk. Refresh first.');
+    if(manifest.writers.some(w=>w.name.toLocaleLowerCase()===name.toLocaleLowerCase()))
+      throw Error('A writer with that name already exists. Choose a distinct name; merging is not part of this hotfix.');
+    const current=await inspectWriterFolder(pending.handle);
+    if(current.originalId && manifest.writers.some(w=>w.id===current.originalId))
+      throw Error('This writer ID already exists. Merging is not supported.');
+    const writer={id:current.originalId||randomId(),name,folder:''};
+    if(pending.insideFolder){
+      const actual=await sourceRoot.getDirectoryHandle(pending.insideFolder);
+      if(typeof actual.isSameEntry==='function'&&!(await actual.isSameEntry(pending.handle)))
+        throw Error('The copied writer folder changed since the preview. Scan again.');
+      writer.folder=pending.insideFolder;
+      if(manifest.writers.some(w=>w.folder.toLocaleLowerCase()===writer.folder.toLocaleLowerCase()))
+        throw Error('This folder is already registered.');
+    }else{
+      const budget=await preflightWriterCopy(pending.handle);
+      $('writerFolderImportStatus').textContent=`Copying ${budget.files} files into a new writer folder. Do not close the tab…`;
+      let attempt=folderSafe(name),suffix=2;
+      while(true){
+        let exists=manifest.writers.some(w=>w.folder.toLowerCase()===attempt.toLowerCase());
+        try{await sourceRoot.getDirectoryHandle(attempt);exists=true;}catch(error){if(error.name!=='NotFoundError')throw error;}
+        if(!exists)break;
+        attempt=folderSafe(name)+'-'+suffix++;
+      }
+      created=attempt;writer.folder=attempt;
+      const dest=await sourceRoot.getDirectoryHandle(created,{create:true});
+      await copyFreshWriterFolder(pending.handle,dest);
+      const verified=await inspectWriterFolder(dest);
+      if(verified.books!==current.books||verified.hasSeries!==current.hasSeries)
+        throw Error('Copied writer data did not pass verification. Registration was stopped.');
+      if(sourceRoot!==state.root)throw Error('The active library changed during copying.');
+    }
+    $('writerFolderImportStatus').textContent='Registering writer in the library manifest…';
+    await commitWriterRegistration(manifest,writer);
+    registered=true;
+    pendingWriterFolder=null;
+    $('writerFolderImportDialog').close();
+    renderWriterCards();
+    writerFolderBusy=false;
+    void scanForWriterFolders();
+    toast(`Writer ${name} added. Existing writer profiles were not changed.`);
+    // The source remains available for recovery until the new files are scanned.
+    if(memoryRecovery.active){memoryRecovery.complete=false;memoryRecovery.partialReason='New writer imported; refreshing temporary recovery snapshot';
+      void captureRecoverySnapshot();}
+    writerFolderBusy=false;
+    await chooseWriter(writer.id);
+  }catch(error){
+    if(created&&!registered){
+      // Never delete files when a manifest write may have registered this folder.
+      let referenced=true;
+      try{const live=await readJSON(await sourceRoot.getFileHandle('character-archive-manifest.json'));
+        referenced=live.writers.some(w=>w.folder===created);
+      }catch{}
+      if(!referenced){try{await removeTrackedEntry(sourceRoot,created,{recursive:true});}
+        catch{ $('writerFolderImportStatus').textContent='An incomplete folder remains: '+created+'. Inspect it before retrying.';}}
+    }
+    $('writerFolderImportStatus').textContent='Not added: '+error.message;
+    toast('Writer folder import stopped: '+error.message,true);
+  }finally{writerFolderBusy=false;button.disabled=false;}
+}
+function initWriterFolderDropZone(){
+  const zone=$('writerFolderDropZone');
+  zone.addEventListener('dragover',event=>{
+    if(!event.dataTransfer?.types?.includes('Files'))return;
+    event.preventDefault();event.dataTransfer.dropEffect='copy';zone.classList.add('isDragging');
+  });
+  zone.addEventListener('dragleave',()=>zone.classList.remove('isDragging'));
+  zone.addEventListener('drop',async event=>{
+    event.preventDefault();zone.classList.remove('isDragging');
+    const items=[...(event.dataTransfer?.items||[])].filter(item=>item.kind==='file');
+    if(items.length!==1||typeof items[0]?.getAsFileSystemHandle!=='function'){
+      toast('Drop one writer folder, or use Add writer from folder. ZIP backups use Backup & restore.',true);return;
+    }
+    try{
+      const handle=await items[0].getAsFileSystemHandle();
+      if(!handle||handle.kind!=='directory')throw Error('Drop the writer folder, not an individual file.');
+      await previewWriterFolder(handle);
+    }catch(error){toast('Cannot read dropped writer folder: '+error.message,true);}
+  });
+}
+
 async function createWriter() {
   const name = await askName('Create writer profile', 'Writer name');
   if (!name) return;
@@ -999,7 +1272,15 @@ async function createWriter() {
   }
   const folders = state.manifest.writers.map(w => w.folder.toLowerCase());
   let folder = folderSafe(name), index = 2;
-  while (folders.includes(folder.toLowerCase())) folder = folderSafe(name) + '-' + index++;
+  // A folder copied in Explorer might not yet be registered. Never silently
+  // open it as a newly created writer and risk mixing unrelated data.
+  while(true){
+    let onDisk=false;
+    try{await state.root.getDirectoryHandle(folder);onDisk=true;}
+    catch(error){if(error.name!=='NotFoundError'){toast('Cannot verify writer folder: '+error.message,true);return;}}
+    if(!onDisk&&!folders.includes(folder.toLowerCase()))break;
+    folder=folderSafe(name)+'-'+index++;
+  }
   const writer = { id: randomId(), name, folder };
   try {
     await state.root.getDirectoryHandle(folder, { create: true });
@@ -1066,6 +1347,7 @@ async function deleteWriter(id) {
 }
 
 async function chooseWriter(id) {
+  if(writerFolderBusy){toast('Finish importing the writer first.',true);return;}
   if (!(await flush())) { toast('Save your changes before switching writers.', true); return; }
   const writer = state.manifest.writers.find(w => w.id === id);
   if (!writer) return;
@@ -3713,6 +3995,12 @@ function init() {
   $('reselectFolderBtn').onclick = selectFolder;
   $('changeFolderBtn').onclick = selectFolder;
   $('newWriterBtn').onclick = createWriter;
+  $('scanWriterFoldersBtn').onclick=()=>void scanForWriterFolders();
+  $('chooseWriterFolderBtn').onclick=()=>void chooseWriterFolderForImport();
+  $('cancelWriterFolderImportBtn').onclick=()=>closeWriterFolderPreview();
+  $('confirmWriterFolderImportBtn').onclick=()=>void confirmWriterFolderImport();
+  $('writerFolderImportDialog').addEventListener('close',()=>{pendingWriterFolder=null;});
+  initWriterFolderDropZone();
   $('storageStatusBtn').onclick=()=>{renderStorageStatus();renderReminderSettings();$('storageStatusDialog').showModal();};
   $('closeStorageStatusBtn').onclick=()=>$('storageStatusDialog').close();
   $('backupReminderDays').onchange=event=>{setBackupReminderDays(Number(event.target.value));renderReminderSettings();};
@@ -3723,7 +4011,7 @@ function init() {
   const switchWriter = async () => {
     if (!(await flush())) return;
     state.writer = null; state.writerDir = null; state.novels = [];state.series=[];state.activeSeries=null;invalidateSearchIndex();clearNovelState();
-    renderWriterCards(); setStage('writer'); status('Choose writer');
+    renderWriterCards(); setStage('writer'); void scanForWriterFolders(); status('Choose writer');
   };
   $('switchWriterBtn').onclick = switchWriter;
   $('topSwitchWriterBtn').onclick = switchWriter;
@@ -3779,7 +4067,7 @@ function init() {
   $('exportPdfNovelBtn').onclick = () => void exportPdf('novel');
   $('exportDocxNovelBtn').onclick = () => void exportDocx('novel');
   window.addEventListener('beforeunload', event => {
-    if (memoryRecovery.pending.size || memoryRecovery.lastFailure || hasUnsaved() || !!state.saving || treeUnsaved() || !!state.treeSaving || !!pendingImport || !!pendingWriterRestore) { event.preventDefault(); event.returnValue = ''; }
+    if (memoryRecovery.pending.size || memoryRecovery.lastFailure || hasUnsaved() || !!state.saving || treeUnsaved() || !!state.treeSaving || !!pendingImport || !!pendingWriterRestore || writerFolderBusy) { event.preventDefault(); event.returnValue = ''; }
   });
   setStage('folder');
 }

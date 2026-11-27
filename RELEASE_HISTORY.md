@@ -1,5 +1,13 @@
 # Release History — Character Bookshelf
 
+## v4.2.6 — Writer Folder Discovery Hotfix (QA candidate)
+- Detects unregistered writer folders copied directly into the active library by validating legacy book/series metadata.
+- Writer selection gains a Scan button, external folder picker, Chromium folder drop area, and reviewed registration preview.
+- In-place registration updates only the library manifest. External folder import copies to a new directory with per-file verification; existing writer data is not overwritten or merged.
+- Refuses duplicate writer names/IDs, checks the manifest for external changes, and avoids accidental collisions with folders that exist on disk but are not registered.
+- 30/30 Node tests and Chromium simulated-folder import scenarios, including actual Claire 30-book/312-file data, passed. No real USB/OS folder-drop/live deployment testing yet.
+
+
 ## v4.2.5 — Classic Cover Titles & Compact Labels (QA candidate)
 - Restored on-cover titles for generated book covers in standard and compact layouts.
 - Supplementary readable title boxes appear **only** when adaptive cover width is under 150px; standard covers have no separate box.
